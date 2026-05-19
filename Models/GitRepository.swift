@@ -1,6 +1,6 @@
 import Foundation
 
-struct GitRepository: Identifiable, Hashable {
+struct GitRepository: Identifiable, Hashable, Sendable {
     let path: URL
 
     var id: String {

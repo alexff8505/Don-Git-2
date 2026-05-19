@@ -20,15 +20,47 @@ struct DonGitApp: App {
                         await store.refreshFromActivation()
                     }
                 }
+                .containerBackground(.ultraThinMaterial, for: .window)
                 .frame(minWidth: 980, minHeight: 620)
         }
         .windowStyle(.titleBar)
+        .commands {
+            CommandGroup(replacing: .newItem) {}
+        }
     }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        NSWindow.allowsAutomaticWindowTabbing = false
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSWindow.allowsAutomaticWindowTabbing = false
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+        Task { @MainActor in
+            AppDelegate.disallowWindowTabs()
+        }
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidBecomeMain(_:)),
+            name: NSWindow.didBecomeMainNotification,
+            object: nil
+        )
+    }
+
+    @objc private func windowDidBecomeMain(_ notification: Notification) {
+        Task { @MainActor in
+            AppDelegate.disallowWindowTabs()
+        }
+    }
+
+    @MainActor
+    private static func disallowWindowTabs() {
+        for window in NSApp.windows {
+            window.tabbingMode = .disallowed
+        }
     }
 }

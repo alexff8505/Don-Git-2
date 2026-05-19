@@ -1,6 +1,6 @@
 import Foundation
 
-struct GitCommit: Identifiable, Hashable {
+struct GitCommit: Identifiable, Hashable, Sendable {
     let hash: String
     let parents: [String]
     let authorName: String
@@ -18,8 +18,8 @@ struct GitCommit: Identifiable, Hashable {
     }
 }
 
-struct GitRefBadge: Identifiable, Hashable {
-    enum Kind: Hashable {
+struct GitRefBadge: Identifiable, Hashable, Sendable {
+    enum Kind: Hashable, Sendable {
         case head
         case currentBranch
         case branch
@@ -35,7 +35,7 @@ struct GitRefBadge: Identifiable, Hashable {
     }
 }
 
-struct CommitRow: Identifiable, Hashable {
+struct CommitRow: Identifiable, Hashable, Sendable {
     let commit: GitCommit
     let graph: CommitGraphState
 
@@ -44,7 +44,7 @@ struct CommitRow: Identifiable, Hashable {
     }
 }
 
-struct CommitGraphState: Hashable {
+struct CommitGraphState: Hashable, Sendable {
     let lanesBefore: [String]
     let lanesAfter: [String]
     let nodeLane: Int
@@ -53,7 +53,7 @@ struct CommitGraphState: Hashable {
     let isMerge: Bool
 }
 
-enum HistoryLayout: String, CaseIterable, Identifiable {
+enum HistoryLayout: String, CaseIterable, Identifiable, Sendable {
     case topological = "Topological"
     case date = "Date"
 

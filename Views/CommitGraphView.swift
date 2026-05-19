@@ -2,9 +2,11 @@ import SwiftUI
 
 struct CommitGraphView: View {
     let graph: CommitGraphState
+    let isFirstRow: Bool
 
     private let laneSpacing: CGFloat = 18
-    private let nodeRadius: CGFloat = 5
+    private let nodeRadius: CGFloat = 4.75
+    private let lineWidth: CGFloat = 2.5
 
     var body: some View {
         Canvas { context, size in
@@ -16,12 +18,19 @@ struct CommitGraphView: View {
     }
 
     private func drawVerticalSegments(in context: inout GraphicsContext, size: CGSize) {
-        for (index, hash) in graph.lanesBefore.enumerated() {
-            strokeLine(lane: index, from: 0, to: size.height / 2, hash: hash, in: &context)
+        let centerY = size.height / 2
+
+        for index in graph.lanesBefore.indices {
+            let startY = isFirstRow ? centerY : -lineWidth
+            let continuesBelow = graph.lanesAfter.indices.contains(index)
+            let endY = continuesBelow ? centerY + lineWidth : centerY
+            strokeLine(lane: index, from: startY, to: endY, in: &context)
         }
 
-        for (index, hash) in graph.lanesAfter.enumerated() {
-            strokeLine(lane: index, from: size.height / 2, to: size.height, hash: hash, in: &context)
+        for index in graph.lanesAfter.indices {
+            let existedAbove = graph.lanesBefore.indices.contains(index)
+            let startY = existedAbove ? centerY - lineWidth : centerY
+            strokeLine(lane: index, from: startY, to: size.height + lineWidth, in: &context)
         }
     }
 
@@ -32,11 +41,11 @@ struct CommitGraphView: View {
             var path = Path()
             path.move(to: start)
             path.addCurve(
-                to: point(lane: lane, y: size.height),
+                to: point(lane: lane, y: size.height + lineWidth),
                 control1: CGPoint(x: start.x, y: size.height * 0.72),
                 control2: CGPoint(x: point(lane: lane, y: size.height).x, y: size.height * 0.72)
             )
-            context.stroke(path, with: .color(ColorPalette.color(for: lane)), lineWidth: 2)
+            context.stroke(path, with: .color(ColorPalette.color(for: lane)), style: strokeStyle)
         }
     }
 
@@ -53,38 +62,37 @@ struct CommitGraphView: View {
         context.fill(Path(ellipseIn: rect), with: .color(color))
 
         if graph.isMerge {
-            context.stroke(Path(ellipseIn: rect.insetBy(dx: -3, dy: -3)), with: .color(color), lineWidth: 1.5)
+            context.stroke(Path(ellipseIn: rect.insetBy(dx: -3, dy: -3)), with: .color(color), lineWidth: 1.75)
         }
     }
 
-    private func strokeLine(lane: Int, from startY: CGFloat, to endY: CGFloat, hash: String, in context: inout GraphicsContext) {
+    private func strokeLine(lane: Int, from startY: CGFloat, to endY: CGFloat, in context: inout GraphicsContext) {
         var path = Path()
         path.move(to: point(lane: lane, y: startY))
         path.addLine(to: point(lane: lane, y: endY))
-        context.stroke(path, with: .color(ColorPalette.color(for: hash)), lineWidth: 2)
+        context.stroke(path, with: .color(ColorPalette.color(for: lane)), style: strokeStyle)
     }
 
     private func point(lane: Int, y: CGFloat) -> CGPoint {
         CGPoint(x: CGFloat(lane) * laneSpacing + 10, y: y)
+    }
+
+    private var strokeStyle: StrokeStyle {
+        StrokeStyle(lineWidth: lineWidth, lineCap: .butt, lineJoin: .round)
     }
 }
 
 private enum ColorPalette {
     private static let colors: [Color] = [
         .orange,
-        .red,
         .blue,
-        .green,
+        .red,
+        .cyan,
         .purple,
-        .pink,
-        .teal,
-        .indigo
+        .green,
+        .indigo,
+        .pink
     ]
-
-    static func color(for hash: String) -> Color {
-        let scalarTotal = hash.unicodeScalars.reduce(0) { $0 + Int($1.value) }
-        return colors[abs(scalarTotal) % colors.count]
-    }
 
     static func color(for lane: Int) -> Color {
         colors[abs(lane) % colors.count]

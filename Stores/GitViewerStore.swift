@@ -13,19 +13,32 @@ final class GitViewerStore: ObservableObject {
     @Published var isLoadingHistory = false
     @Published var errorMessage: String?
 
-    private let scanner = GitRepositoryScanner()
+    private struct CacheKey: Hashable {
+        let repositoryID: GitRepository.ID
+        let layout: HistoryLayout
+    }
+
+    private struct HistoryCacheEntry {
+        let signature: String
+        let branch: String?
+        let rows: [CommitRow]
+    }
+
     private let gitClient = GitClient()
+    private var historyCache: [CacheKey: HistoryCacheEntry] = [:]
     private var hasLoadedInitialData = false
     private var autoRefreshTask: Task<Void, Never>?
     private var isRefreshing = false
+    private var historyLoadGeneration = 0
 
     var selectedRepository: GitRepository? {
-        repositories.first { $0.id == selectedRepositoryID }
+        guard let selectedRepositoryID else { return nil }
+        return repositories.first { $0.id == selectedRepositoryID }
     }
 
     var graphColumnWidth: CGFloat {
         let maxLaneCount = rows.map(\.graph.laneCount).max() ?? 1
-        return CGFloat(min(max(maxLaneCount, 1), 12)) * 18 + 22
+        return CGFloat(min(max(maxLaneCount, 1), 8)) * 18 + 26
     }
 
     func loadInitialData() async {
@@ -40,7 +53,7 @@ final class GitViewerStore: ObservableObject {
 
         autoRefreshTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(4))
+                try? await Task.sleep(for: .seconds(10))
                 guard !Task.isCancelled else { return }
                 await self?.refreshSilently()
             }
@@ -57,6 +70,7 @@ final class GitViewerStore: ObservableObject {
     func setLayout(_ newLayout: HistoryLayout) async {
         guard layout != newLayout else { return }
         layout = newLayout
+        selectedCommitID = nil
         await reloadSelectedHistory()
     }
 
@@ -83,6 +97,9 @@ final class GitViewerStore: ObservableObject {
 
         if let selectedRepositoryID, !found.contains(where: { $0.id == selectedRepositoryID }) {
             self.selectedRepositoryID = nil
+            rows = []
+            selectedCommitID = nil
+            currentBranch = nil
         }
 
         if selectedRepositoryID == nil, selectFirstIfNeeded {
@@ -92,30 +109,53 @@ final class GitViewerStore: ObservableObject {
 
     private func reloadSelectedHistory(showsLoading: Bool = true) async {
         guard let selectedRepository else {
+            historyLoadGeneration += 1
             rows = []
+            selectedCommitID = nil
             currentBranch = nil
             errorMessage = repositories.isEmpty ? "No git repositories were found in ~/Sites." : nil
             return
         }
 
+        historyLoadGeneration += 1
+        let loadGeneration = historyLoadGeneration
+        let repositoryID = selectedRepository.id
+
         if showsLoading {
             isLoadingHistory = true
         }
         errorMessage = nil
-        defer {
-            if showsLoading {
-                isLoadingHistory = false
-            }
-        }
 
         do {
-            async let history = gitClient.loadHistory(repository: selectedRepository, layout: layout)
-            async let branch = gitClient.currentBranch(repository: selectedRepository)
-            rows = try await history
-            currentBranch = await branch
+            async let signatureTask = gitClient.historySignature(repository: selectedRepository)
+            async let branchTask = gitClient.currentBranch(repository: selectedRepository)
+            let signature = try await signatureTask
+            let branch = await branchTask
+            let cacheKey = CacheKey(repositoryID: selectedRepository.id, layout: layout)
+
+            guard isCurrentHistoryLoad(loadGeneration, repositoryID: repositoryID) else { return }
+
+            if let cached = historyCache[cacheKey], cached.signature == signature {
+                rows = cached.rows
+                currentBranch = branch ?? cached.branch
+                isLoadingHistory = false
+                return
+            }
+
+            let loadedRows = try await gitClient.loadHistory(repository: selectedRepository, layout: layout)
+            guard isCurrentHistoryLoad(loadGeneration, repositoryID: repositoryID) else { return }
+
+            historyCache[cacheKey] = HistoryCacheEntry(signature: signature, branch: branch, rows: loadedRows)
+            rows = loadedRows
+            currentBranch = branch
+            isLoadingHistory = false
         } catch {
+            guard isCurrentHistoryLoad(loadGeneration, repositoryID: repositoryID) else { return }
+
             rows = []
+            selectedCommitID = nil
             currentBranch = nil
+            isLoadingHistory = false
             errorMessage = error.localizedDescription
         }
     }
@@ -127,5 +167,9 @@ final class GitViewerStore: ObservableObject {
 
         await refreshRepositories(selectFirstIfNeeded: false, showsLoading: false)
         await reloadSelectedHistory(showsLoading: false)
+    }
+
+    private func isCurrentHistoryLoad(_ generation: Int, repositoryID: GitRepository.ID) -> Bool {
+        historyLoadGeneration == generation && selectedRepositoryID == repositoryID
     }
 }

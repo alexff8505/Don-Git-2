@@ -10,6 +10,8 @@ struct ContentView: View {
         } detail: {
             RepositoryHistoryView(store: store)
         }
+        .navigationTitle(store.selectedRepository?.name ?? "DonGit")
+        .navigationSubtitle(navigationSubtitle)
         .toolbar {
             ToolbarItemGroup {
                 Picker("Layout", selection: layoutBinding) {
@@ -19,8 +21,19 @@ struct ContentView: View {
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 220)
+                .disabled(store.selectedRepositoryID == nil)
             }
         }
+    }
+
+    private var navigationSubtitle: String {
+        guard store.selectedRepository != nil else {
+            return "Git repositories in ~/Sites"
+        }
+
+        let branch = store.currentBranch?.isEmpty == false ? store.currentBranch : nil
+        let count = "\(store.rows.count.formatted()) commits"
+        return [branch, count].compactMap { $0 }.joined(separator: "  ")
     }
 
     private var layoutBinding: Binding<HistoryLayout> {

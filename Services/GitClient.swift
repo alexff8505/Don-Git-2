@@ -1,6 +1,6 @@
 import Foundation
 
-struct GitClient {
+struct GitClient: Sendable {
     enum GitClientError: LocalizedError {
         case commandFailed(String)
         case invalidOutput
@@ -16,6 +16,44 @@ struct GitClient {
     }
 
     func loadHistory(repository: GitRepository, layout: HistoryLayout) async throws -> [CommitRow] {
+        try await Task.detached(priority: .userInitiated) {
+            try loadHistorySync(repository: repository, layout: layout)
+        }.value
+    }
+
+    func currentBranch(repository: GitRepository) async -> String? {
+        await Task.detached(priority: .utility) {
+            if let branch = try? runGit(["symbolic-ref", "--quiet", "--short", "HEAD"], in: repository.path)
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+                !branch.isEmpty {
+                return branch
+            }
+
+            return try? runGit(["rev-parse", "--abbrev-ref", "HEAD"], in: repository.path)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }.value
+    }
+
+    func historySignature(repository: GitRepository) async throws -> String {
+        try await Task.detached(priority: .utility) {
+            let head = (try? runGit(["rev-parse", "--verify", "HEAD"], in: repository.path)
+                .trimmingCharacters(in: .whitespacesAndNewlines)) ?? "EMPTY"
+            let refs = try runGit([
+                "for-each-ref",
+                "--format=%(objectname) %(refname)",
+                "refs/heads",
+                "refs/remotes",
+                "refs/tags"
+            ], in: repository.path)
+
+            return head + "\n" + refs
+        }.value
+    }
+
+    private func loadHistorySync(repository: GitRepository, layout: HistoryLayout) throws -> [CommitRow] {
+        let hasCommits = (try? runGit(["rev-parse", "--verify", "HEAD"], in: repository.path)) != nil
+        guard hasCommits else { return [] }
+
         var arguments = [
             "log",
             "--all",
@@ -30,27 +68,43 @@ struct GitClient {
         return CommitGraphBuilder().rows(for: commits)
     }
 
-    func currentBranch(repository: GitRepository) async -> String? {
-        try? runGit(["rev-parse", "--abbrev-ref", "HEAD"], in: repository.path)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     private func runGit(_ arguments: [String], in directory: URL) throws -> String {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
         process.arguments = arguments
         process.currentDirectoryURL = directory
 
-        let outputPipe = Pipe()
-        let errorPipe = Pipe()
-        process.standardOutput = outputPipe
-        process.standardError = errorPipe
+        let fileManager = FileManager.default
+        let temporaryDirectory = fileManager.temporaryDirectory
+            .appending(path: "DonGit-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try fileManager.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
+        defer {
+            try? fileManager.removeItem(at: temporaryDirectory)
+        }
+
+        let outputURL = temporaryDirectory.appending(path: "stdout")
+        let errorURL = temporaryDirectory.appending(path: "stderr")
+
+        guard fileManager.createFile(atPath: outputURL.path, contents: nil),
+              fileManager.createFile(atPath: errorURL.path, contents: nil) else {
+            throw GitClientError.commandFailed("Unable to create temporary git output files.")
+        }
+
+        let outputHandle = try FileHandle(forWritingTo: outputURL)
+        let errorHandle = try FileHandle(forWritingTo: errorURL)
+        process.standardOutput = outputHandle
+        process.standardError = errorHandle
 
         try process.run()
         process.waitUntilExit()
 
-        let output = String(data: outputPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-        let error = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        try? outputHandle.close()
+        try? errorHandle.close()
+
+        let outputData = try Data(contentsOf: outputURL)
+        let errorData = try Data(contentsOf: errorURL)
+        let output = String(data: outputData, encoding: .utf8) ?? ""
+        let error = String(data: errorData, encoding: .utf8) ?? ""
 
         guard process.terminationStatus == 0 else {
             throw GitClientError.commandFailed(error.trimmingCharacters(in: .whitespacesAndNewlines))

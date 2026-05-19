@@ -4,7 +4,7 @@ set -euo pipefail
 MODE="${1:-run}"
 APP_NAME="DonGit"
 BUNDLE_ID="com.alexfraser.DonGit"
-MIN_SYSTEM_VERSION="14.0"
+MIN_SYSTEM_VERSION="26.0"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
@@ -16,7 +16,7 @@ INFO_PLIST="$APP_CONTENTS/Info.plist"
 
 export HOME="$ROOT_DIR/.home"
 export CLANG_MODULE_CACHE_PATH="$ROOT_DIR/.build/ModuleCache"
-export SDKROOT="/Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk"
+export SDKROOT="/Library/Developer/CommandLineTools/SDKs/MacOSX26.0.sdk"
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
