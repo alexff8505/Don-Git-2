@@ -1,0 +1,4 @@
+.build/
+.home/
+dist/
+.DS_Store
