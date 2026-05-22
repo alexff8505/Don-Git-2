@@ -26,6 +26,13 @@ struct CommitTable: View {
             }
             .width(min: 260, ideal: 520, max: 900)
 
+            TableColumn("Hash") { row in
+                Text(row.commit.shortHash)
+                    .font(.system(.body, design: .monospaced))
+                    .lineLimit(1)
+            }
+            .width(min: 78, ideal: 96, max: 160)
+
             TableColumn("Author") { row in
                 HStack(spacing: 6) {
                     Image(systemName: "person.crop.square.fill")
@@ -64,10 +71,6 @@ private struct CommitSummaryCell: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            Text(row.commit.shortHash)
-                .font(.system(.body, design: .monospaced))
-                .lineLimit(1)
-
             ForEach(visibleBadges) { badge in
                 RefBadgeView(
                     badge: badge,
@@ -117,6 +120,7 @@ private struct RefBadgeView: View {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .stroke(border, lineWidth: 1)
         }
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     private var systemImage: String {
