@@ -51,6 +51,7 @@ struct CommitGraphState: Hashable, Sendable {
     let parentLanes: [Int]
     let laneCount: Int
     let isMerge: Bool
+    let hasIncomingLane: Bool
 }
 
 enum HistoryLayout: String, CaseIterable, Identifiable, Sendable {

@@ -21,16 +21,29 @@ struct CommitGraphView: View {
         let centerY = size.height / 2
 
         for index in graph.lanesBefore.indices {
-            let startY = isFirstRow ? centerY : -lineWidth
-            let continuesBelow = graph.lanesAfter.indices.contains(index)
-            let endY = continuesBelow ? centerY + lineWidth : centerY
-            strokeLine(lane: index, from: startY, to: endY, in: &context)
+            if index == graph.nodeLane {
+                guard graph.hasIncomingLane else { continue }
+                let startY = isFirstRow ? centerY - nodeRadius : 0
+                strokeLine(lane: index, from: startY, to: centerY - nodeRadius, in: &context)
+                continue
+            }
+
+            if let afterHash = graph.lanesAfter[safe: index],
+               afterHash == graph.lanesBefore[index] {
+                strokeLine(lane: index, from: 0, to: size.height, in: &context)
+            } else {
+                strokeLine(lane: index, from: 0, to: centerY, in: &context)
+            }
         }
 
         for index in graph.lanesAfter.indices {
-            let existedAbove = graph.lanesBefore.indices.contains(index)
-            let startY = existedAbove ? centerY - lineWidth : centerY
-            strokeLine(lane: index, from: startY, to: size.height + lineWidth, in: &context)
+            if index == graph.nodeLane {
+                strokeLine(lane: index, from: centerY + nodeRadius, to: size.height, in: &context)
+                continue
+            }
+
+            guard graph.lanesBefore[safe: index] != graph.lanesAfter[index] else { continue }
+            strokeLine(lane: index, from: centerY, to: size.height, in: &context)
         }
     }
 
@@ -38,12 +51,13 @@ struct CommitGraphView: View {
         let start = point(lane: graph.nodeLane, y: size.height / 2)
 
         for lane in graph.parentLanes where lane != graph.nodeLane {
+            let targetY = size.height - nodeRadius
             var path = Path()
-            path.move(to: start)
+            path.move(to: point(lane: graph.nodeLane, y: size.height / 2 + nodeRadius))
             path.addCurve(
-                to: point(lane: lane, y: size.height + lineWidth),
+                to: point(lane: lane, y: targetY),
                 control1: CGPoint(x: start.x, y: size.height * 0.72),
-                control2: CGPoint(x: point(lane: lane, y: size.height).x, y: size.height * 0.72)
+                control2: CGPoint(x: point(lane: lane, y: targetY).x, y: size.height * 0.72)
             )
             context.stroke(path, with: .color(ColorPalette.color(for: lane)), style: strokeStyle)
         }
@@ -79,6 +93,12 @@ struct CommitGraphView: View {
 
     private var strokeStyle: StrokeStyle {
         StrokeStyle(lineWidth: lineWidth, lineCap: .butt, lineJoin: .round)
+    }
+}
+
+private extension Array {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
 

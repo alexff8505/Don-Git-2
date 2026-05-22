@@ -276,11 +276,11 @@ private struct RefBadgeView: View {
         case .head:
             .secondary
         case .currentBranch:
-            .primary
+            badge.branchPalette.foreground
         case .branch:
-            .orange
+            badge.branchPalette.foreground
         case .remote:
-            .red
+            badge.branchPalette.foreground
         case .tag:
             .purple
         }
@@ -290,16 +290,61 @@ private struct RefBadgeView: View {
         switch badge.kind {
         case .head:
             Color.secondary.opacity(0.08)
-        case .currentBranch, .branch:
-            Color.orange.opacity(0.12)
-        case .remote:
-            Color.red.opacity(0.10)
+        case .currentBranch, .branch, .remote:
+            badge.branchPalette.background
         case .tag:
             Color.purple.opacity(0.10)
         }
     }
 
     private var border: Color {
-        foreground.opacity(0.45)
+        switch badge.kind {
+        case .currentBranch, .branch, .remote:
+            badge.branchPalette.border
+        default:
+            foreground.opacity(0.45)
+        }
+    }
+}
+
+private struct RefBadgePalette {
+    let foreground: Color
+    let background: Color
+    let border: Color
+}
+
+private extension GitRefBadge {
+    var branchPalette: RefBadgePalette {
+        let normalizedName = name.lowercased()
+
+        if normalizedName == "main" || normalizedName.hasSuffix("/main") || normalizedName.hasSuffix("/head") {
+            return RefBadgePalette(
+                foreground: Color.primary,
+                background: Color.secondary.opacity(0.12),
+                border: Color.secondary.opacity(0.55)
+            )
+        }
+
+        if normalizedName == "dev" || normalizedName.hasSuffix("/dev") {
+            return RefBadgePalette(
+                foreground: .blue,
+                background: Color.blue.opacity(0.12),
+                border: Color.blue.opacity(0.55)
+            )
+        }
+
+        if kind == .remote {
+            return RefBadgePalette(
+                foreground: .red,
+                background: Color.red.opacity(0.10),
+                border: Color.red.opacity(0.50)
+            )
+        }
+
+        return RefBadgePalette(
+            foreground: .orange,
+            background: Color.orange.opacity(0.13),
+            border: Color.orange.opacity(0.55)
+        )
     }
 }

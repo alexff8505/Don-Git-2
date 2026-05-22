@@ -7,6 +7,7 @@ struct CommitGraphBuilder {
 
         for commit in commits {
             var nodeLane = lanes.firstIndex(of: commit.hash)
+            let hasIncomingLane = nodeLane != nil
             if nodeLane == nil {
                 lanes.append(commit.hash)
                 nodeLane = lanes.count - 1
@@ -35,7 +36,8 @@ struct CommitGraphBuilder {
                 nodeLane: currentLane,
                 parentLanes: parentLanes,
                 laneCount: max(lanesBefore.count, lanes.count, currentLane + 1),
-                isMerge: commit.parents.count > 1
+                isMerge: commit.parents.count > 1,
+                hasIncomingLane: hasIncomingLane
             )
 
             rows.append(CommitRow(commit: commit, graph: graph))
