@@ -14,7 +14,7 @@ struct ContentView: View {
         .navigationTitle(store.selectedRepository?.name ?? "DonGit")
         .navigationSubtitle(navigationSubtitle)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
                 Button {
                     isShowingCommitSheet = true
                 } label: {
@@ -22,6 +22,16 @@ struct ContentView: View {
                 }
                 .disabled(store.selectedRepository == nil || store.localChangesCount == 0 || store.isCommitting)
                 .help("Commit all local changes")
+
+                Button {
+                    Task {
+                        await store.pushSelectedRepository()
+                    }
+                } label: {
+                    Label("Push", systemImage: "arrow.up.circle")
+                }
+                .disabled(store.selectedRepository == nil || store.isPushing || store.isCommitting)
+                .help("Push current branch")
             }
         }
         .sheet(isPresented: $isShowingCommitSheet) {

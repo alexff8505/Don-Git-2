@@ -10,6 +10,7 @@ final class GitViewerStore: ObservableObject {
     @Published var currentBranch: String?
     @Published var localChangesCount = 0
     @Published var isCommitting = false
+    @Published var isPushing = false
     @Published var isLoadingRepositories = false
     @Published var isLoadingHistory = false
     @Published var errorMessage: String?
@@ -83,6 +84,21 @@ final class GitViewerStore: ObservableObject {
             errorMessage = error.localizedDescription
         }
         isCommitting = false
+    }
+
+    func pushSelectedRepository() async {
+        guard let selectedRepository, !isPushing else { return }
+
+        isPushing = true
+        errorMessage = nil
+        do {
+            try await gitClient.push(repository: selectedRepository)
+            historyCache[selectedRepository.id] = nil
+            await reloadSelectedHistory()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isPushing = false
     }
 
     private func refreshRepositories(selectFirstIfNeeded: Bool, showsLoading: Bool = true) async {

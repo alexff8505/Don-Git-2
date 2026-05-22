@@ -50,6 +50,12 @@ struct GitClient: Sendable {
         }.value
     }
 
+    func push(repository: GitRepository) async throws {
+        try await Task.detached(priority: .userInitiated) {
+            _ = try runGit(["push"], in: repository.path)
+        }.value
+    }
+
     func historySignature(repository: GitRepository) async throws -> String {
         try await Task.detached(priority: .utility) {
             let head = (try? runGit(["rev-parse", "--verify", "HEAD"], in: repository.path)
