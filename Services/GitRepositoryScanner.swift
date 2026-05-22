@@ -46,13 +46,12 @@ struct GitRepositoryScanner {
     private func runGit(_ arguments: [String], in directory: URL) throws -> String {
         let process = Process()
         let outputPipe = Pipe()
-        let errorPipe = Pipe()
 
         process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
         process.arguments = arguments
         process.currentDirectoryURL = directory
         process.standardOutput = outputPipe
-        process.standardError = errorPipe
+        process.standardError = FileHandle.nullDevice
 
         try process.run()
         process.waitUntilExit()

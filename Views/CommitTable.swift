@@ -9,7 +9,9 @@ struct CommitTable: View {
         Table(rows, selection: $selectedCommitID) {
             TableColumn("Graph") { row in
                 CommitGraphView(graph: row.graph, isFirstRow: row.id == rows.first?.id)
-                    .frame(height: CommitTableMetrics.rowHeight)
+                    .frame(height: CommitTableMetrics.rowHeight + CommitTableMetrics.graphVerticalBleed * 2)
+                    .offset(y: -CommitTableMetrics.graphVerticalBleed)
+                    .frame(height: CommitTableMetrics.rowHeight, alignment: .top)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 2)
             }
@@ -61,10 +63,7 @@ private enum CommitTableMetrics {
     static let rowHeight: CGFloat = 34
     static let minimumGraphWidth: CGFloat = 72
     static let maximumGraphWidth: CGFloat = 220
-    static let laneSpacing: CGFloat = 18
-    static let laneXInset: CGFloat = 14
-    static let nodeRadius: CGFloat = 4.75
-    static let lineWidth: CGFloat = 2.5
+    static let graphVerticalBleed: CGFloat = 6
 }
 
 private struct CommitSummaryCell: View {

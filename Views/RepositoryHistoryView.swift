@@ -30,6 +30,5 @@ struct RepositoryHistoryView: View {
                 )
             }
         }
-        .background(.background)
     }
 }

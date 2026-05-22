@@ -35,7 +35,6 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
-        .scrollContentBackground(.hidden)
         .overlay {
             if store.isLoadingRepositories && store.repositories.isEmpty {
                 ProgressView()
