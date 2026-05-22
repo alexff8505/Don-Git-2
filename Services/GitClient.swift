@@ -15,9 +15,9 @@ struct GitClient: Sendable {
         }
     }
 
-    func loadHistory(repository: GitRepository, layout: HistoryLayout) async throws -> [CommitRow] {
+    func loadHistory(repository: GitRepository) async throws -> [CommitRow] {
         try await Task.detached(priority: .userInitiated) {
-            try loadHistorySync(repository: repository, layout: layout)
+            try loadHistorySync(repository: repository)
         }.value
     }
 
@@ -31,6 +31,15 @@ struct GitClient: Sendable {
 
             return try? runGit(["rev-parse", "--abbrev-ref", "HEAD"], in: repository.path)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
+        }.value
+    }
+
+    func localChangesCount(repository: GitRepository) async throws -> Int {
+        try await Task.detached(priority: .utility) {
+            let output = try runGit(["status", "--porcelain"], in: repository.path)
+            return output
+                .split(separator: "\n", omittingEmptySubsequences: true)
+                .count
         }.value
     }
 
@@ -50,18 +59,18 @@ struct GitClient: Sendable {
         }.value
     }
 
-    private func loadHistorySync(repository: GitRepository, layout: HistoryLayout) throws -> [CommitRow] {
+    private func loadHistorySync(repository: GitRepository) throws -> [CommitRow] {
         let hasCommits = (try? runGit(["rev-parse", "--verify", "HEAD"], in: repository.path)) != nil
         guard hasCommits else { return [] }
 
-        var arguments = [
+        let arguments = [
             "log",
             "--all",
+            "--topo-order",
             "--decorate=short",
             "--date=iso-strict",
             "--format=%H%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D%x1e"
         ]
-        arguments.insert(contentsOf: layout.gitOrderingArguments, at: 2)
 
         let output = try runGit(arguments, in: repository.path)
         let commits = try parseCommits(output)

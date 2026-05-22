@@ -47,6 +47,7 @@ struct CommitRow: Identifiable, Hashable, Sendable {
 struct CommitGraphState: Hashable, Sendable {
     let lanesBefore: [String]
     let lanesAfter: [String]
+    let laneMoves: [CommitGraphLaneMove]
     let nodeLane: Int
     let parentLanes: [Int]
     let laneCount: Int
@@ -54,20 +55,7 @@ struct CommitGraphState: Hashable, Sendable {
     let hasIncomingLane: Bool
 }
 
-enum HistoryLayout: String, CaseIterable, Identifiable, Sendable {
-    case topological = "Topological"
-    case date = "Date"
-
-    var id: Self {
-        self
-    }
-
-    var gitOrderingArguments: [String] {
-        switch self {
-        case .topological:
-            return ["--topo-order"]
-        case .date:
-            return ["--date-order"]
-        }
-    }
+struct CommitGraphLaneMove: Hashable, Sendable {
+    let fromLane: Int
+    let toLane: Int
 }

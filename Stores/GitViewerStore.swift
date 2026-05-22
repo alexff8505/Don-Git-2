@@ -7,16 +7,11 @@ final class GitViewerStore: ObservableObject {
     @Published var selectedRepositoryID: GitRepository.ID?
     @Published var rows: [CommitRow] = []
     @Published var selectedCommitID: CommitRow.ID?
-    @Published var layout: HistoryLayout = .topological
     @Published var currentBranch: String?
+    @Published var localChangesCount = 0
     @Published var isLoadingRepositories = false
     @Published var isLoadingHistory = false
     @Published var errorMessage: String?
-
-    private struct CacheKey: Hashable {
-        let repositoryID: GitRepository.ID
-        let layout: HistoryLayout
-    }
 
     private struct HistoryCacheEntry {
         let signature: String
@@ -25,7 +20,7 @@ final class GitViewerStore: ObservableObject {
     }
 
     private let gitClient = GitClient()
-    private var historyCache: [CacheKey: HistoryCacheEntry] = [:]
+    private var historyCache: [GitRepository.ID: HistoryCacheEntry] = [:]
     private var hasLoadedInitialData = false
     private var autoRefreshTask: Task<Void, Never>?
     private var isRefreshing = false
@@ -38,7 +33,7 @@ final class GitViewerStore: ObservableObject {
 
     var graphColumnWidth: CGFloat {
         let maxLaneCount = rows.map(\.graph.laneCount).max() ?? 1
-        return CGFloat(min(max(maxLaneCount, 1), 8)) * 18 + 26
+        return CGFloat(min(max(maxLaneCount, 1), 10)) * 14 + 22
     }
 
     func loadInitialData() async {
@@ -63,13 +58,6 @@ final class GitViewerStore: ObservableObject {
     func selectRepository(_ id: GitRepository.ID?) async {
         guard selectedRepositoryID != id else { return }
         selectedRepositoryID = id
-        selectedCommitID = nil
-        await reloadSelectedHistory()
-    }
-
-    func setLayout(_ newLayout: HistoryLayout) async {
-        guard layout != newLayout else { return }
-        layout = newLayout
         selectedCommitID = nil
         await reloadSelectedHistory()
     }
@@ -100,6 +88,7 @@ final class GitViewerStore: ObservableObject {
             rows = []
             selectedCommitID = nil
             currentBranch = nil
+            localChangesCount = 0
         }
 
         if selectedRepositoryID == nil, selectFirstIfNeeded {
@@ -113,6 +102,7 @@ final class GitViewerStore: ObservableObject {
             rows = []
             selectedCommitID = nil
             currentBranch = nil
+            localChangesCount = 0
             errorMessage = repositories.isEmpty ? "No git repositories were found in ~/Sites." : nil
             return
         }
@@ -129,23 +119,25 @@ final class GitViewerStore: ObservableObject {
         do {
             async let signatureTask = gitClient.historySignature(repository: selectedRepository)
             async let branchTask = gitClient.currentBranch(repository: selectedRepository)
+            async let localChangesTask = gitClient.localChangesCount(repository: selectedRepository)
             let signature = try await signatureTask
             let branch = await branchTask
-            let cacheKey = CacheKey(repositoryID: selectedRepository.id, layout: layout)
+            let localChanges = (try? await localChangesTask) ?? 0
 
             guard isCurrentHistoryLoad(loadGeneration, repositoryID: repositoryID) else { return }
+            localChangesCount = localChanges
 
-            if let cached = historyCache[cacheKey], cached.signature == signature {
+            if let cached = historyCache[selectedRepository.id], cached.signature == signature {
                 rows = cached.rows
                 currentBranch = branch ?? cached.branch
                 isLoadingHistory = false
                 return
             }
 
-            let loadedRows = try await gitClient.loadHistory(repository: selectedRepository, layout: layout)
+            let loadedRows = try await gitClient.loadHistory(repository: selectedRepository)
             guard isCurrentHistoryLoad(loadGeneration, repositoryID: repositoryID) else { return }
 
-            historyCache[cacheKey] = HistoryCacheEntry(signature: signature, branch: branch, rows: loadedRows)
+            historyCache[selectedRepository.id] = HistoryCacheEntry(signature: signature, branch: branch, rows: loadedRows)
             rows = loadedRows
             currentBranch = branch
             isLoadingHistory = false
@@ -155,6 +147,7 @@ final class GitViewerStore: ObservableObject {
             rows = []
             selectedCommitID = nil
             currentBranch = nil
+            localChangesCount = 0
             isLoadingHistory = false
             errorMessage = error.localizedDescription
         }

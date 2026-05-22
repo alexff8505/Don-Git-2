@@ -12,19 +12,6 @@ struct ContentView: View {
         }
         .navigationTitle(store.selectedRepository?.name ?? "DonGit")
         .navigationSubtitle(navigationSubtitle)
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Picker("Layout", selection: layoutBinding) {
-                    ForEach(HistoryLayout.allCases) { layout in
-                        Text(layout.rawValue).tag(layout)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .controlSize(.small)
-                .frame(width: 188)
-                .disabled(store.selectedRepositoryID == nil)
-            }
-        }
     }
 
     private var navigationSubtitle: String {
@@ -34,16 +21,7 @@ struct ContentView: View {
 
         let branch = store.currentBranch?.isEmpty == false ? store.currentBranch : nil
         let count = "\(store.rows.count.formatted()) commits"
-        return [branch, count].compactMap { $0 }.joined(separator: "  ")
-    }
-
-    private var layoutBinding: Binding<HistoryLayout> {
-        Binding {
-            store.layout
-        } set: { newLayout in
-            Task {
-                await store.setLayout(newLayout)
-            }
-        }
+        let localChanges = "Local Changes: (\(store.localChangesCount.formatted()))"
+        return [branch, count, localChanges].compactMap { $0 }.joined(separator: "  ")
     }
 }

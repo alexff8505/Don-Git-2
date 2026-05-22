@@ -38,13 +38,6 @@ struct CommitTable: View {
             }
             .width(min: 120, ideal: 170, max: 280)
 
-            TableColumn("Hash") { row in
-                Text(row.commit.shortHash)
-                    .font(.system(.body, design: .monospaced))
-                    .lineLimit(1)
-            }
-            .width(min: 78, ideal: 96, max: 160)
-
             TableColumn("Date") { row in
                 Text(DisplayFormatters.commitDate(row.commit.authoredAt))
                     .lineLimit(1)
@@ -60,10 +53,10 @@ struct CommitTable: View {
 }
 
 private enum CommitTableMetrics {
-    static let rowHeight: CGFloat = 34
-    static let minimumGraphWidth: CGFloat = 72
+    static let rowHeight: CGFloat = 30
+    static let minimumGraphWidth: CGFloat = 58
     static let maximumGraphWidth: CGFloat = 220
-    static let graphVerticalBleed: CGFloat = 6
+    static let graphVerticalBleed: CGFloat = 5
 }
 
 private struct CommitSummaryCell: View {
@@ -71,6 +64,10 @@ private struct CommitSummaryCell: View {
 
     var body: some View {
         HStack(spacing: 5) {
+            Text(row.commit.shortHash)
+                .font(.system(.body, design: .monospaced))
+                .lineLimit(1)
+
             ForEach(visibleBadges) { badge in
                 RefBadgeView(
                     badge: badge,
