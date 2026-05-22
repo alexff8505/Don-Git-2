@@ -2,6 +2,7 @@ import Foundation
 
 struct GitRepository: Identifiable, Hashable, Sendable {
     let path: URL
+    let updatedAt: Date?
 
     var id: String {
         path.path

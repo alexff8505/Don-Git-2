@@ -61,7 +61,7 @@ struct CommitGraphView: View {
                 control1: CGPoint(x: start.x, y: size.height * 0.72),
                 control2: CGPoint(x: point(lane: lane, y: targetY).x, y: size.height * 0.72)
             )
-            context.stroke(path, with: .color(ColorPalette.color(for: lane)), style: strokeStyle)
+            context.stroke(path, with: .color(GitGraphColorPalette.color(for: lane)), style: strokeStyle)
         }
     }
 
@@ -74,7 +74,7 @@ struct CommitGraphView: View {
             height: nodeRadius * 2
         )
 
-        let color = ColorPalette.color(for: graph.nodeLane)
+        let color = GitGraphColorPalette.color(for: graph.nodeLane)
         context.fill(Path(ellipseIn: rect), with: .color(color))
 
         if graph.isMerge {
@@ -86,7 +86,7 @@ struct CommitGraphView: View {
         var path = Path()
         path.move(to: point(lane: lane, y: startY))
         path.addLine(to: point(lane: lane, y: endY))
-        context.stroke(path, with: .color(ColorPalette.color(for: lane)), style: strokeStyle)
+        context.stroke(path, with: .color(GitGraphColorPalette.color(for: lane)), style: strokeStyle)
     }
 
     private func point(lane: Int, y: CGFloat) -> CGPoint {
@@ -101,22 +101,5 @@ struct CommitGraphView: View {
 private extension Array {
     subscript(safe index: Index) -> Element? {
         indices.contains(index) ? self[index] : nil
-    }
-}
-
-private enum ColorPalette {
-    private static let colors: [Color] = [
-        .orange,
-        .blue,
-        .red,
-        .cyan,
-        .purple,
-        .green,
-        .indigo,
-        .pink
-    ]
-
-    static func color(for lane: Int) -> Color {
-        colors[abs(lane) % colors.count]
     }
 }

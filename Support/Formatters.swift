@@ -27,4 +27,8 @@ enum DisplayFormatters {
 
         return dateFormatter.string(from: date)
     }
+
+    static func repositoryUpdatedDate(_ date: Date) -> String {
+        commitDate(date)
+    }
 }
