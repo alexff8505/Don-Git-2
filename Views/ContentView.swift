@@ -12,9 +12,12 @@ struct ContentView: View {
             RepositoryHistoryView(store: store)
         }
         .navigationTitle(store.selectedRepository?.name ?? "DonGit")
-        .navigationSubtitle(navigationSubtitle)
+        .navigationSubtitle(store.selectedRepository == nil ? "Git repositories in ~/Sites" : "")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                RepositoryStatusView(store: store)
+                    .padding(.leading, 8)
+
                 Button {
                     isShowingCommitSheet = true
                 } label: {
@@ -22,32 +25,42 @@ struct ContentView: View {
                 }
                 .disabled(store.selectedRepository == nil || store.localChangesCount == 0 || store.isCommitting)
                 .help("Commit all local changes")
-
-                Button {
-                    Task {
-                        await store.pushSelectedRepository()
-                    }
-                } label: {
-                    Label("Push", systemImage: "arrow.up.circle")
-                }
-                .disabled(store.selectedRepository == nil || store.isPushing || store.isCommitting)
-                .help("Push current branch")
             }
         }
         .sheet(isPresented: $isShowingCommitSheet) {
             CommitSheet(store: store, isPresented: $isShowingCommitSheet)
         }
     }
+}
 
-    private var navigationSubtitle: String {
-        guard store.selectedRepository != nil else {
-            return "Git repositories in ~/Sites"
+private struct RepositoryStatusView: View {
+    @ObservedObject var store: GitViewerStore
+
+    var body: some View {
+        if store.selectedRepository != nil {
+            HStack(spacing: 10) {
+                if let branch {
+                    HStack(spacing: 5) {
+                        Image(systemName: "arrow.triangle.branch")
+                            .imageScale(.small)
+                        Text(branch)
+                    }
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.primary)
+                }
+
+                Text("\(store.rows.count.formatted()) commits")
+                Text("Local Changes: (\(store.localChangesCount.formatted()))")
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
         }
+    }
 
-        let branch = store.currentBranch?.isEmpty == false ? store.currentBranch : nil
-        let count = "\(store.rows.count.formatted()) commits"
-        let localChanges = "Local Changes: (\(store.localChangesCount.formatted()))"
-        return [branch, count, localChanges].compactMap { $0 }.joined(separator: "  ")
+    private var branch: String? {
+        guard store.currentBranch?.isEmpty == false else { return nil }
+        return store.currentBranch
     }
 }
 
