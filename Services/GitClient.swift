@@ -52,7 +52,7 @@ struct GitClient: Sendable {
 
     func push(repository: GitRepository) async throws {
         try await Task.detached(priority: .userInitiated) {
-            _ = try runGit(["push"], in: repository.path)
+            _ = try runGit(["push", "--porcelain"], in: repository.path)
         }.value
     }
 
@@ -95,6 +95,7 @@ struct GitClient: Sendable {
         process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
         process.arguments = arguments
         process.currentDirectoryURL = directory
+        process.environment = gitProcessEnvironment()
 
         let fileManager = FileManager.default
         let temporaryDirectory = fileManager.temporaryDirectory
@@ -129,10 +130,26 @@ struct GitClient: Sendable {
         let error = String(data: errorData, encoding: .utf8) ?? ""
 
         guard process.terminationStatus == 0 else {
-            throw GitClientError.commandFailed(error.trimmingCharacters(in: .whitespacesAndNewlines))
+            let message = [error, output]
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .joined(separator: "\n")
+            throw GitClientError.commandFailed(message.isEmpty ? "Git command failed." : message)
         }
 
         return output
+    }
+
+    private func gitProcessEnvironment() -> [String: String] {
+        var environment = ProcessInfo.processInfo.environment
+        let defaultPath = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        if let path = environment["PATH"], !path.isEmpty {
+            environment["PATH"] = defaultPath + ":" + path
+        } else {
+            environment["PATH"] = defaultPath
+        }
+
+        return environment
     }
 
     private func parseCommits(_ output: String) throws -> [GitCommit] {
