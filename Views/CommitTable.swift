@@ -242,7 +242,7 @@ private struct CommitSummaryCell: View {
             ForEach(row.commit.refs.prefix(4)) { badge in
                 RefBadgeView(
                     badge: badge,
-                    branchColor: GitGraphColorPalette.color(for: row.graph.nodeLane)
+                    localBranchColor: row.graph.color(forCommitHash: row.commit.hash)
                 )
             }
 
@@ -255,7 +255,7 @@ private struct CommitSummaryCell: View {
 
 private struct RefBadgeView: View {
     let badge: GitRefBadge
-    let branchColor: Color
+    let localBranchColor: Color
 
     var body: some View {
         HStack(spacing: 3) {
@@ -292,8 +292,12 @@ private struct RefBadgeView: View {
         switch badge.kind {
         case .head:
             .green
-        case .currentBranch, .branch, .remote, .tag:
-            branchColor
+        case .remote:
+            Color(red: 0.58, green: 0.43, blue: 0.12)
+        case .currentBranch, .branch:
+            localBranchColor
+        case .tag:
+            .purple
         }
     }
 
@@ -301,8 +305,12 @@ private struct RefBadgeView: View {
         switch badge.kind {
         case .head:
             Color.green.opacity(0.12)
-        case .currentBranch, .branch, .remote, .tag:
-            branchColor.opacity(0.12)
+        case .remote:
+            Color(red: 0.96, green: 0.86, blue: 0.58).opacity(0.30)
+        case .currentBranch, .branch:
+            localBranchColor.opacity(0.12)
+        case .tag:
+            Color.purple.opacity(0.10)
         }
     }
 
@@ -310,8 +318,22 @@ private struct RefBadgeView: View {
         switch badge.kind {
         case .head:
             Color.green.opacity(0.55)
-        case .currentBranch, .branch, .remote, .tag:
-            branchColor.opacity(0.55)
+        case .remote:
+            Color(red: 0.78, green: 0.62, blue: 0.24).opacity(0.55)
+        case .currentBranch, .branch:
+            localBranchColor.opacity(0.55)
+        case .tag:
+            Color.purple.opacity(0.45)
         }
+    }
+}
+
+private extension CommitGraphState {
+    func color(forCommitHash hash: String) -> Color {
+        if let lane = lanesBefore.firstIndex(of: hash) {
+            return GitGraphColorPalette.color(for: lane)
+        }
+
+        return GitGraphColorPalette.color(for: nodeLane)
     }
 }

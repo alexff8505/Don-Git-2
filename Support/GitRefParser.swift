@@ -2,10 +2,12 @@ import Foundation
 
 enum GitRefParser {
     static func badges(from refs: String) -> [GitRefBadge] {
-        refs.split(separator: ",")
+        let badges = refs.split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .flatMap(badges(fromDecoratedRef:))
+
+        return orderedBadges(badges)
     }
 
     private static func badges(fromDecoratedRef ref: String) -> [GitRefBadge] {
@@ -25,10 +27,44 @@ enum GitRefParser {
             return [GitRefBadge(name: String(ref.dropFirst("tag: ".count)), kind: .tag)]
         }
 
-        if ref.contains("/") {
+        if ref.hasPrefix("origin/") {
             return [GitRefBadge(name: ref, kind: .remote)]
         }
 
         return [GitRefBadge(name: ref, kind: .branch)]
+    }
+
+    private static func orderedBadges(_ badges: [GitRefBadge]) -> [GitRefBadge] {
+        let heads = badges.filter { $0.kind == .head }
+        let locals = badges.filter { $0.kind == .currentBranch || $0.kind == .branch }
+        let remotes = badges.filter { $0.kind == .remote }
+        let tags = badges.filter { $0.kind == .tag }
+        var usedRemoteIDs = Set<GitRefBadge.ID>()
+
+        var ordered = heads
+
+        for local in locals {
+            ordered.append(local)
+
+            for remote in remotes where remote.localName == local.name {
+                ordered.append(remote)
+                usedRemoteIDs.insert(remote.id)
+            }
+        }
+
+        ordered.append(contentsOf: remotes.filter { !usedRemoteIDs.contains($0.id) })
+        ordered.append(contentsOf: tags)
+
+        return ordered
+    }
+}
+
+private extension GitRefBadge {
+    var localName: String {
+        guard kind == .remote, let slashIndex = name.firstIndex(of: "/") else {
+            return name
+        }
+
+        return String(name[name.index(after: slashIndex)...])
     }
 }
