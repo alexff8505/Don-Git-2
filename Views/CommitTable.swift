@@ -103,6 +103,7 @@ private struct CommitSummaryCell: View {
 private struct RefBadgeView: View {
     let badge: GitRefBadge
     let localBranchColor: Color
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         HStack(spacing: 3) {
@@ -141,7 +142,7 @@ private struct RefBadgeView: View {
         case .head:
             .green
         case .remote:
-            Color(red: 0.58, green: 0.43, blue: 0.12)
+            remoteForeground
         case .currentBranch, .branch:
             localBranchColor
         case .tag:
@@ -154,7 +155,7 @@ private struct RefBadgeView: View {
         case .head:
             Color.green.opacity(0.12)
         case .remote:
-            Color(red: 0.96, green: 0.86, blue: 0.58).opacity(0.30)
+            remoteForeground.opacity(colorScheme == .dark ? 0.20 : 0.14)
         case .currentBranch, .branch:
             localBranchColor.opacity(0.12)
         case .tag:
@@ -167,12 +168,18 @@ private struct RefBadgeView: View {
         case .head:
             Color.green.opacity(0.55)
         case .remote:
-            Color(red: 0.78, green: 0.62, blue: 0.24).opacity(0.55)
+            remoteForeground.opacity(colorScheme == .dark ? 0.72 : 0.50)
         case .currentBranch, .branch:
             localBranchColor.opacity(0.55)
         case .tag:
             Color.purple.opacity(0.45)
         }
+    }
+
+    private var remoteForeground: Color {
+        colorScheme == .dark
+            ? Color(red: 1.00, green: 0.70, blue: 0.22)
+            : Color(red: 0.58, green: 0.36, blue: 0.02)
     }
 }
 
