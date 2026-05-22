@@ -9,6 +9,7 @@ final class GitViewerStore: ObservableObject {
     @Published var selectedCommitID: CommitRow.ID?
     @Published var currentBranch: String?
     @Published var localChangesCount = 0
+    @Published var isCommitting = false
     @Published var isLoadingRepositories = false
     @Published var isLoadingHistory = false
     @Published var errorMessage: String?
@@ -65,6 +66,23 @@ final class GitViewerStore: ObservableObject {
     func refreshFromActivation() async {
         guard hasLoadedInitialData else { return }
         await refreshSilently()
+    }
+
+    func commitAllChanges(message: String) async {
+        guard let selectedRepository else { return }
+        let trimmedMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedMessage.isEmpty, localChangesCount > 0, !isCommitting else { return }
+
+        isCommitting = true
+        errorMessage = nil
+        do {
+            try await gitClient.commitAllChanges(repository: selectedRepository, message: trimmedMessage)
+            historyCache[selectedRepository.id] = nil
+            await reloadSelectedHistory()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isCommitting = false
     }
 
     private func refreshRepositories(selectFirstIfNeeded: Bool, showsLoading: Bool = true) async {

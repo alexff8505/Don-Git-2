@@ -43,6 +43,13 @@ struct GitClient: Sendable {
         }.value
     }
 
+    func commitAllChanges(repository: GitRepository, message: String) async throws {
+        try await Task.detached(priority: .userInitiated) {
+            _ = try runGit(["add", "-A"], in: repository.path)
+            _ = try runGit(["commit", "-m", message], in: repository.path)
+        }.value
+    }
+
     func historySignature(repository: GitRepository) async throws -> String {
         try await Task.detached(priority: .utility) {
             let head = (try? runGit(["rev-parse", "--verify", "HEAD"], in: repository.path)
