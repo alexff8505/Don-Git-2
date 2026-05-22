@@ -10,24 +10,18 @@ struct ContentView: View {
         } detail: {
             RepositoryHistoryView(store: store)
         }
-        .navigationTitle("")
-        .navigationSubtitle("")
+        .navigationTitle(store.selectedRepository?.name ?? "DonGit")
+        .navigationSubtitle(navigationSubtitle)
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                RepositoryTitleView(
-                    title: store.selectedRepository?.name ?? "DonGit",
-                    subtitle: navigationSubtitle
-                )
-            }
-
-            ToolbarItemGroup {
+            ToolbarItemGroup(placement: .primaryAction) {
                 Picker("Layout", selection: layoutBinding) {
                     ForEach(HistoryLayout.allCases) { layout in
                         Text(layout.rawValue).tag(layout)
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 220)
+                .controlSize(.small)
+                .frame(width: 188)
                 .disabled(store.selectedRepositoryID == nil)
             }
         }
@@ -51,24 +45,5 @@ struct ContentView: View {
                 await store.setLayout(newLayout)
             }
         }
-    }
-}
-
-private struct RepositoryTitleView: View {
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(title)
-                .font(.system(size: 20, weight: .bold))
-                .lineLimit(1)
-
-            Text(subtitle)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .frame(minWidth: 220, alignment: .leading)
     }
 }

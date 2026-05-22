@@ -13,7 +13,11 @@ struct CommitTable: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let resolvedCommitWidth = max(commitWidth, geometry.size.width - fixedColumnWidth)
+            let availableCommitWidth = geometry.size.width - fixedColumnWidth
+            let resolvedCommitWidth = max(
+                CommitTableMetrics.minimumCommitWidth,
+                min(commitWidth, availableCommitWidth)
+            )
             let tableWidth = graphWidth
                 + resolvedCommitWidth
                 + authorWidth
@@ -52,17 +56,18 @@ struct CommitTable: View {
                         .frame(width: tableWidth)
                     }
                     .frame(width: tableWidth, height: rowsHeight)
-                    .background(Color.white)
+                    .background(.background)
                 }
                 .frame(width: tableWidth)
             }
-            .background(Color.white)
+            .id(horizontalScrollIdentity)
+            .background(.background)
         }
         .onAppear {
             graphWidth = fittedGraphWidth
         }
         .onChange(of: graphColumnWidth) { _, newValue in
-            graphWidth = max(56, min(newValue, 180))
+            graphWidth = max(CommitTableMetrics.minimumGraphWidth, min(newValue, 180))
         }
     }
 
@@ -71,13 +76,17 @@ struct CommitTable: View {
     }
 
     private var fittedGraphWidth: CGFloat {
-        max(56, min(graphColumnWidth, 180))
+        max(CommitTableMetrics.minimumGraphWidth, min(graphColumnWidth, 180))
+    }
+
+    private var horizontalScrollIdentity: String {
+        rows.first?.id ?? "empty-history"
     }
 
     private func header(commitWidth: CGFloat) -> some View {
         HStack(spacing: 0) {
             HeaderCell(title: "Graph", width: graphWidth)
-            ColumnResizer(width: $graphWidth, minimum: 56, maximum: 220)
+            ColumnResizer(width: $graphWidth, minimum: CommitTableMetrics.minimumGraphWidth, maximum: 220)
 
             HeaderCell(title: "Commit", width: commitWidth)
             ColumnResizer(width: $commitWidth, minimum: 260, maximum: 900)
@@ -94,15 +103,17 @@ struct CommitTable: View {
         .font(.caption.weight(.semibold))
         .foregroundStyle(.secondary)
         .frame(height: CommitTableMetrics.headerHeight)
-        .background(.bar)
+        .background(.regularMaterial)
     }
 }
 
 private enum CommitTableMetrics {
-    static let headerHeight: CGFloat = 30
+    static let headerHeight: CGFloat = 32
     static let resizerWidth: CGFloat = 9
     static let resizerCount: CGFloat = 5
-    static let rowHeight: CGFloat = 38
+    static let rowHeight: CGFloat = 34
+    static let minimumGraphWidth: CGFloat = 72
+    static let minimumCommitWidth: CGFloat = 260
     static let laneSpacing: CGFloat = 18
     static let laneXInset: CGFloat = 14
     static let nodeRadius: CGFloat = 4.75
@@ -116,8 +127,8 @@ private struct HeaderCell: View {
     var body: some View {
         Text(title)
             .lineLimit(1)
-            .frame(width: width, alignment: .leading)
             .padding(.leading, 10)
+            .frame(width: width, alignment: .leading)
     }
 }
 
@@ -177,9 +188,11 @@ private struct CommitDataRow: View {
             HStack(spacing: 6) {
                 Image(systemName: "person.crop.square.fill")
                     .foregroundStyle(.secondary)
+                    .imageScale(.small)
                 Text(row.commit.authorName)
                     .lineLimit(1)
             }
+            .font(.callout)
             .frame(width: authorWidth, alignment: .leading)
 
             ColumnGutter()
@@ -203,11 +216,11 @@ private struct CommitDataRow: View {
 
     private var rowBackground: some ShapeStyle {
         if isSelected {
-            return AnyShapeStyle(Color.accentColor.opacity(0.28))
+            return AnyShapeStyle(Color.accentColor.opacity(0.18))
         }
 
         if isAlternate {
-            return AnyShapeStyle(Color.black.opacity(0.035))
+            return AnyShapeStyle(Color.secondary.opacity(0.045))
         }
 
         return AnyShapeStyle(Color.clear)

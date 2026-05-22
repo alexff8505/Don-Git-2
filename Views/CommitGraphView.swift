@@ -19,6 +19,7 @@ struct CommitGraphView: View {
 
     private func drawVerticalSegments(in context: inout GraphicsContext, size: CGSize) {
         let centerY = size.height / 2
+        let connectorTargetY = size.height - nodeRadius
 
         for index in graph.lanesBefore.indices {
             if index == graph.nodeLane {
@@ -43,7 +44,8 @@ struct CommitGraphView: View {
             }
 
             guard graph.lanesBefore[safe: index] != graph.lanesAfter[index] else { continue }
-            strokeLine(lane: index, from: centerY, to: size.height, in: &context)
+            let startY = graph.parentLanes.contains(index) ? connectorTargetY : centerY
+            strokeLine(lane: index, from: startY, to: size.height, in: &context)
         }
     }
 
