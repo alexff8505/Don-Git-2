@@ -24,7 +24,7 @@ struct CommitTable: View {
             TableColumn("Commit") { row in
                 CommitSummaryCell(row: row)
             }
-            .width(min: 260, ideal: 520, max: 900)
+            .width(min: 260, ideal: 680, max: 1_600)
 
             TableColumn("Hash") { row in
                 Text(row.commit.shortHash)
@@ -70,117 +70,108 @@ private struct CommitSummaryCell: View {
     let row: CommitRow
 
     var body: some View {
-        HStack(spacing: 5) {
-            ForEach(visibleBadges) { badge in
-                RefBadgeView(
-                    badge: badge,
-                    localBranchColor: row.graph.color(forCommitHash: row.commit.hash)
-                )
+        GeometryReader { proxy in
+            HStack(spacing: 5) {
+                ForEach(row.commit.refs) { badge in
+                    RefBadgeView(badge: badge)
+                }
+
+                Text(row.commit.subject)
+                    .lineLimit(1)
+                    .foregroundStyle(row.commit.subject.isEmpty ? .secondary : .primary)
             }
-
-            Text(row.commit.subject)
-                .lineLimit(1)
-                .foregroundStyle(row.commit.subject.isEmpty ? .secondary : .primary)
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .leading)
+            .clipped()
         }
-    }
-
-    private var visibleBadges: [GitRefBadge] {
-        let baseLimit = 4
-        var visible = Array(row.commit.refs.prefix(baseLimit))
-
-        guard let nextBadge = row.commit.refs.dropFirst(baseLimit).first,
-              nextBadge.kind == .remote,
-              let lastLocalBadge = visible.last(where: { $0.kind == .currentBranch || $0.kind == .branch }),
-              nextBadge.remoteLocalName == lastLocalBadge.name else {
-            return visible
-        }
-
-        visible.append(nextBadge)
-        return visible
     }
 }
 
 private struct RefBadgeView: View {
     let badge: GitRefBadge
-    let localBranchColor: Color
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        HStack(spacing: 3) {
-            Image(systemName: systemImage)
-                .imageScale(.small)
+        HStack(spacing: 0) {
             Text(badge.name)
                 .lineLimit(1)
         }
-        .font(.caption.weight(.semibold))
-        .padding(.horizontal, 5)
-        .padding(.vertical, 2)
-        .foregroundStyle(foreground)
-        .background(background, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .font(.caption2.weight(.bold))
+        .padding(.horizontal, 4)
+        .padding(.vertical, 1.5)
+        .foregroundStyle(style.foreground)
+        .background(style.background, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .stroke(border, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .stroke(style.border, lineWidth: 1)
         }
         .fixedSize(horizontal: true, vertical: false)
     }
 
-    private var systemImage: String {
+    private var style: RefBadgeStyle {
+        let name = badge.name.lowercased()
+
         switch badge.kind {
         case .head:
-            "scope"
-        case .currentBranch, .branch:
-            "checkmark"
+            return RefBadgeStyle(
+                foreground: .white,
+                background: Color(red: 0.70, green: 0.29, blue: 0.02),
+                border: Color(red: 1.00, green: 0.49, blue: 0.08)
+            )
         case .remote:
-            "network"
+            if name == "origin/head" {
+                return RefBadgeStyle(
+                    foreground: .white,
+                    background: Color(red: 0.76, green: 0.34, blue: 0.04),
+                    border: Color(red: 1.00, green: 0.56, blue: 0.13)
+                )
+            }
+
+            return RefBadgeStyle(
+                foreground: Color(red: 0.94, green: 0.91, blue: 1.00),
+                background: Color(red: 0.17, green: 0.10, blue: 0.42),
+                border: Color(red: 0.55, green: 0.36, blue: 1.00)
+            )
+        case .currentBranch:
+            return RefBadgeStyle(
+                foreground: Color(red: 0.86, green: 1.00, blue: 0.94),
+                background: Color(red: 0.00, green: 0.42, blue: 0.33),
+                border: Color(red: 0.00, green: 0.86, blue: 0.65)
+            )
+        case .branch:
+            if name == "dev" {
+                return RefBadgeStyle(
+                    foreground: Color(red: 0.86, green: 1.00, blue: 0.94),
+                    background: Color(red: 0.00, green: 0.42, blue: 0.33),
+                    border: Color(red: 0.00, green: 0.86, blue: 0.65)
+                )
+            }
+
+            if name == "main" {
+                return RefBadgeStyle(
+                    foreground: Color(red: 0.86, green: 1.00, blue: 0.94),
+                    background: Color(red: 0.00, green: 0.42, blue: 0.33),
+                    border: Color(red: 0.00, green: 0.86, blue: 0.65)
+                )
+            }
+
+            return RefBadgeStyle(
+                foreground: Color(red: 0.86, green: 1.00, blue: 0.94),
+                background: Color(red: 0.00, green: 0.42, blue: 0.33),
+                border: Color(red: 0.00, green: 0.86, blue: 0.65)
+            )
         case .tag:
-            "tag"
+            return RefBadgeStyle(
+                foreground: Color(red: 0.94, green: 0.91, blue: 1.00),
+                background: Color(red: 0.17, green: 0.10, blue: 0.42),
+                border: Color(red: 0.55, green: 0.36, blue: 1.00)
+            )
         }
     }
+}
 
-    private var foreground: Color {
-        switch badge.kind {
-        case .head:
-            .green
-        case .remote:
-            remoteForeground
-        case .currentBranch, .branch:
-            localBranchColor
-        case .tag:
-            .purple
-        }
-    }
-
-    private var background: Color {
-        switch badge.kind {
-        case .head:
-            Color.green.opacity(0.12)
-        case .remote:
-            remoteForeground.opacity(colorScheme == .dark ? 0.20 : 0.14)
-        case .currentBranch, .branch:
-            localBranchColor.opacity(0.12)
-        case .tag:
-            Color.purple.opacity(0.10)
-        }
-    }
-
-    private var border: Color {
-        switch badge.kind {
-        case .head:
-            Color.green.opacity(0.55)
-        case .remote:
-            remoteForeground.opacity(colorScheme == .dark ? 0.72 : 0.50)
-        case .currentBranch, .branch:
-            localBranchColor.opacity(0.55)
-        case .tag:
-            Color.purple.opacity(0.45)
-        }
-    }
-
-    private var remoteForeground: Color {
-        colorScheme == .dark
-            ? Color(red: 1.00, green: 0.70, blue: 0.22)
-            : Color(red: 0.58, green: 0.36, blue: 0.02)
-    }
+private struct RefBadgeStyle {
+    let foreground: Color
+    let background: Color
+    let border: Color
 }
 
 private extension CommitGraphState {
