@@ -36,12 +36,14 @@ enum GitRefParser {
 
     private static func orderedBadges(_ badges: [GitRefBadge]) -> [GitRefBadge] {
         let heads = badges.filter { $0.kind == .head }
+        let headRemotes = badges.filter { $0.kind == .remote && $0.name == "origin/HEAD" }
         let locals = badges.filter { $0.kind == .currentBranch || $0.kind == .branch }
-        let remotes = badges.filter { $0.kind == .remote }
+        let remotes = badges.filter { $0.kind == .remote && $0.name != "origin/HEAD" }
         let tags = badges.filter { $0.kind == .tag }
         var usedRemoteIDs = Set<GitRefBadge.ID>()
 
         var ordered = heads
+        ordered.append(contentsOf: headRemotes)
 
         for local in locals {
             ordered.append(local)

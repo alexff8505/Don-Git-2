@@ -60,10 +60,10 @@ struct CommitTable: View {
 }
 
 private enum CommitTableMetrics {
-    static let rowHeight: CGFloat = 30
+    static let rowHeight: CGFloat = 42
     static let minimumGraphWidth: CGFloat = 58
     static let maximumGraphWidth: CGFloat = 220
-    static let graphVerticalBleed: CGFloat = 5
+    static let graphVerticalBleed: CGFloat = 7
 }
 
 private struct CommitSummaryCell: View {
@@ -71,14 +71,18 @@ private struct CommitSummaryCell: View {
 
     var body: some View {
         GeometryReader { proxy in
-            HStack(spacing: 5) {
-                ForEach(row.commit.refs) { badge in
-                    RefBadgeView(badge: badge)
-                }
-
+            VStack(alignment: .leading, spacing: 2) {
                 Text(row.commit.subject)
                     .lineLimit(1)
                     .foregroundStyle(row.commit.subject.isEmpty ? .secondary : .primary)
+
+                HStack(spacing: 5) {
+                    ForEach(row.commit.refs) { badge in
+                        RefBadgeView(badge: badge)
+                    }
+                }
+                .frame(width: proxy.size.width, alignment: .leading)
+                .clipped()
             }
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .leading)
             .clipped()
