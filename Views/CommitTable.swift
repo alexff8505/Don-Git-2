@@ -98,15 +98,17 @@ private struct RefBadgeView: View {
             Text(badge.name)
                 .lineLimit(1)
         }
-        .font(.caption2.weight(.bold))
-        .padding(.horizontal, 4)
-        .padding(.vertical, 1.5)
+        .font(.caption2.weight(.semibold))
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
         .foregroundStyle(style.foreground)
-        .background(style.background, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
+        .background(.thinMaterial, in: Capsule())
+        .background(style.tint.opacity(0.18), in: Capsule())
         .overlay {
-            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .stroke(style.border, lineWidth: 1)
+            Capsule()
+                .stroke(style.border, lineWidth: 0.75)
         }
+        .shadow(color: .black.opacity(0.08), radius: 0.5, y: 0.5)
         .fixedSize(horizontal: true, vertical: false)
     }
 
@@ -116,57 +118,49 @@ private struct RefBadgeView: View {
         switch badge.kind {
         case .head:
             return RefBadgeStyle(
-                foreground: .white,
-                background: Color(red: 0.70, green: 0.29, blue: 0.02),
-                border: Color(red: 1.00, green: 0.49, blue: 0.08)
+                foreground: .orange,
+                tint: .orange
             )
         case .remote:
             if name == "origin/head" {
                 return RefBadgeStyle(
-                    foreground: .white,
-                    background: Color(red: 0.76, green: 0.34, blue: 0.04),
-                    border: Color(red: 1.00, green: 0.56, blue: 0.13)
+                    foreground: .orange,
+                    tint: .orange
                 )
             }
 
             return RefBadgeStyle(
-                foreground: Color(red: 0.94, green: 0.91, blue: 1.00),
-                background: Color(red: 0.17, green: 0.10, blue: 0.42),
-                border: Color(red: 0.55, green: 0.36, blue: 1.00)
+                foreground: .purple,
+                tint: .purple
             )
         case .currentBranch:
             return RefBadgeStyle(
-                foreground: Color(red: 0.86, green: 1.00, blue: 0.94),
-                background: Color(red: 0.00, green: 0.42, blue: 0.33),
-                border: Color(red: 0.00, green: 0.86, blue: 0.65)
+                foreground: .green,
+                tint: .green
             )
         case .branch:
             if name == "dev" {
                 return RefBadgeStyle(
-                    foreground: Color(red: 0.86, green: 1.00, blue: 0.94),
-                    background: Color(red: 0.00, green: 0.42, blue: 0.33),
-                    border: Color(red: 0.00, green: 0.86, blue: 0.65)
+                    foreground: .green,
+                    tint: .green
                 )
             }
 
             if name == "main" {
                 return RefBadgeStyle(
-                    foreground: Color(red: 0.86, green: 1.00, blue: 0.94),
-                    background: Color(red: 0.00, green: 0.42, blue: 0.33),
-                    border: Color(red: 0.00, green: 0.86, blue: 0.65)
+                    foreground: .green,
+                    tint: .green
                 )
             }
 
             return RefBadgeStyle(
-                foreground: Color(red: 0.86, green: 1.00, blue: 0.94),
-                background: Color(red: 0.00, green: 0.42, blue: 0.33),
-                border: Color(red: 0.00, green: 0.86, blue: 0.65)
+                foreground: .green,
+                tint: .green
             )
         case .tag:
             return RefBadgeStyle(
-                foreground: Color(red: 0.94, green: 0.91, blue: 1.00),
-                background: Color(red: 0.17, green: 0.10, blue: 0.42),
-                border: Color(red: 0.55, green: 0.36, blue: 1.00)
+                foreground: .purple,
+                tint: .purple
             )
         }
     }
@@ -174,8 +168,11 @@ private struct RefBadgeView: View {
 
 private struct RefBadgeStyle {
     let foreground: Color
-    let background: Color
-    let border: Color
+    let tint: Color
+
+    var border: Color {
+        tint.opacity(0.42)
+    }
 }
 
 private extension CommitGraphState {

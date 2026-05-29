@@ -8,7 +8,6 @@ struct CommitGraphView: View {
     private let nodeRadius: CGFloat = 4.2
     private let lineWidth: CGFloat = 2.25
     private let connectorLandingRatio: CGFloat = 0.78
-    private let nodeFill = Color(red: 0.07, green: 0.12, blue: 0.17)
 
     var body: some View {
         Canvas { context, size in
@@ -105,8 +104,7 @@ struct CommitGraphView: View {
         )
 
         let node = Path(ellipseIn: rect)
-        context.fill(node, with: .color(nodeFill))
-        context.stroke(node, with: .color(.white), lineWidth: 3)
+        context.fill(node, with: .color(GitGraphColorPalette.color(for: graph.nodeLane)))
     }
 
     private func strokeLine(lane: Int, from startY: CGFloat, to endY: CGFloat, in context: inout GraphicsContext) {
