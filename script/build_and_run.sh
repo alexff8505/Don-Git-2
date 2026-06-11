@@ -5,7 +5,7 @@ MODE="${1:-run}"
 DISPLAY_NAME="Don Git 2"
 EXECUTABLE_NAME="DonGit"
 BUNDLE_ID="com.alexfraser.DonGit2"
-MIN_SYSTEM_VERSION="26.0"
+MIN_SYSTEM_VERSION="15.0"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
@@ -20,7 +20,7 @@ APP_ICON="$ROOT_DIR/Assets/AppIcon.icns"
 
 export HOME="$ROOT_DIR/.home"
 export CLANG_MODULE_CACHE_PATH="$ROOT_DIR/.build/ModuleCache"
-export SDKROOT="/Library/Developer/CommandLineTools/SDKs/MacOSX26.0.sdk"
+export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
 
 pkill -x "$EXECUTABLE_NAME" >/dev/null 2>&1 || true
 
