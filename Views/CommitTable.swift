@@ -178,10 +178,11 @@ private struct RefBadgeStyle {
 private extension CommitGraphState {
     func color(forCommitHash hash: String) -> Color {
         if let lane = lanesBefore.firstIndex(of: hash) {
-            return GitGraphColorPalette.color(for: lane)
+            let colorIndex = laneColorIndexesBefore.indices.contains(lane) ? laneColorIndexesBefore[lane] : lane
+            return GitGraphColorPalette.color(for: colorIndex)
         }
 
-        return GitGraphColorPalette.color(for: nodeLane)
+        return GitGraphColorPalette.color(for: nodeColorIndex)
     }
 }
 

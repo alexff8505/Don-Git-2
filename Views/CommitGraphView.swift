@@ -5,8 +5,8 @@ struct CommitGraphView: View {
     let isFirstRow: Bool
 
     private let laneSpacing: CGFloat = 14
-    private let nodeRadius: CGFloat = 4.2
-    private let lineWidth: CGFloat = 2.25
+    private let nodeRadius: CGFloat = 4
+    private let lineWidth: CGFloat = 2
     private let connectorLandingRatio: CGFloat = 0.78
 
     var body: some View {
@@ -29,29 +29,30 @@ struct CommitGraphView: View {
             if index == graph.nodeLane {
                 guard graph.hasIncomingLane else { continue }
                 let startY = isFirstRow ? centerY - nodeRadius : 0
-                strokeLine(lane: index, from: startY, to: centerY - nodeRadius, in: &context)
+                strokeLine(lane: index, from: startY, to: centerY - nodeRadius, colorIndex: graph.nodeColorIndex, in: &context)
                 continue
             }
 
+            let colorIndex = colorIndexBefore(lane: index)
             if let afterHash = graph.lanesAfter[safe: index],
                afterHash == graph.lanesBefore[index],
                !movingFromLanes.contains(index) {
-                strokeLine(lane: index, from: 0, to: size.height, in: &context)
+                strokeLine(lane: index, from: 0, to: size.height, colorIndex: colorIndex, in: &context)
             } else {
-                strokeLine(lane: index, from: 0, to: centerY, in: &context)
+                strokeLine(lane: index, from: 0, to: centerY, colorIndex: colorIndex, in: &context)
             }
         }
 
         for index in graph.lanesAfter.indices {
             if index == graph.nodeLane {
                 guard graph.parentLanes.contains(index) else { continue }
-                strokeLine(lane: index, from: centerY + nodeRadius, to: size.height, in: &context)
+                strokeLine(lane: index, from: centerY + nodeRadius, to: size.height, colorIndex: colorIndexAfter(lane: index), in: &context)
                 continue
             }
 
             guard movingToLanes.contains(index) || graph.lanesBefore[safe: index] != graph.lanesAfter[index] else { continue }
             let startY = graph.parentLanes.contains(index) || movingToLanes.contains(index) ? connectorTargetY : centerY
-            strokeLine(lane: index, from: startY, to: size.height, in: &context)
+            strokeLine(lane: index, from: startY, to: size.height, colorIndex: colorIndexAfter(lane: index), in: &context)
         }
     }
 
@@ -67,30 +68,30 @@ struct CommitGraphView: View {
                 control1: point(lane: move.fromLane, y: targetY),
                 control2: point(lane: move.toLane, y: centerY)
             )
-            context.stroke(path, with: .color(GitGraphColorPalette.color(for: move.toLane)), style: connectorStrokeStyle)
+            context.stroke(path, with: .color(GitGraphColorPalette.color(for: move.colorIndex)), style: connectorStrokeStyle)
         }
     }
 
     private func drawParentConnectors(in context: inout GraphicsContext, size: CGSize) {
         let centerY = size.height / 2
 
-        for lane in graph.parentLanes where lane != graph.nodeLane {
+        for (offset, lane) in graph.parentLanes.enumerated() where lane != graph.nodeLane {
             let direction = lane > graph.nodeLane ? CGFloat(1) : CGFloat(-1)
             let start = point(lane: graph.nodeLane, y: centerY)
-            let origin = CGPoint(x: start.x + nodeRadius * direction, y: start.y)
             let target = point(lane: lane, y: connectorLandingY(in: size))
             let controlY = centerY + (target.y - centerY) * 0.68
+            let colorIndex = graph.parentConnectorColorIndexes[safe: offset] ?? graph.nodeColorIndex
 
             var path = Path()
-            path.move(to: origin)
+            path.move(to: start)
             path.addCurve(
                 to: target,
-                control1: CGPoint(x: origin.x, y: controlY),
+                control1: CGPoint(x: start.x + nodeRadius * direction, y: controlY),
                 control2: CGPoint(x: target.x, y: controlY)
             )
-            context.stroke(path, with: .color(GitGraphColorPalette.color(for: lane)), style: connectorStrokeStyle)
+            context.stroke(path, with: .color(GitGraphColorPalette.color(for: colorIndex)), style: connectorStrokeStyle)
 
-            strokeLine(lane: lane, from: target.y - lineWidth, to: target.y + lineWidth, in: &context)
+            strokeLine(lane: lane, from: target.y - lineWidth, to: target.y + lineWidth, colorIndex: colorIndex, in: &context)
         }
     }
 
@@ -104,14 +105,14 @@ struct CommitGraphView: View {
         )
 
         let node = Path(ellipseIn: rect)
-        context.fill(node, with: .color(GitGraphColorPalette.color(for: graph.nodeLane)))
+        context.fill(node, with: .color(GitGraphColorPalette.color(for: graph.nodeColorIndex)))
     }
 
-    private func strokeLine(lane: Int, from startY: CGFloat, to endY: CGFloat, in context: inout GraphicsContext) {
+    private func strokeLine(lane: Int, from startY: CGFloat, to endY: CGFloat, colorIndex: Int, in context: inout GraphicsContext) {
         var path = Path()
         path.move(to: point(lane: lane, y: startY))
         path.addLine(to: point(lane: lane, y: endY))
-        context.stroke(path, with: .color(GitGraphColorPalette.color(for: lane)), style: strokeStyle)
+        context.stroke(path, with: .color(GitGraphColorPalette.color(for: colorIndex)), style: strokeStyle)
     }
 
     private func point(lane: Int, y: CGFloat) -> CGPoint {
@@ -120,6 +121,14 @@ struct CommitGraphView: View {
 
     private func connectorLandingY(in size: CGSize) -> CGFloat {
         min(size.height - nodeRadius, size.height * connectorLandingRatio)
+    }
+
+    private func colorIndexBefore(lane: Int) -> Int {
+        graph.laneColorIndexesBefore[safe: lane] ?? lane
+    }
+
+    private func colorIndexAfter(lane: Int) -> Int {
+        graph.laneColorIndexesAfter[safe: lane] ?? lane
     }
 
     private var strokeStyle: StrokeStyle {

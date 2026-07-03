@@ -47,9 +47,13 @@ struct CommitRow: Identifiable, Hashable, Sendable {
 struct CommitGraphState: Hashable, Sendable {
     let lanesBefore: [String]
     let lanesAfter: [String]
+    let laneColorIndexesBefore: [Int]
+    let laneColorIndexesAfter: [Int]
     let laneMoves: [CommitGraphLaneMove]
     let nodeLane: Int
+    let nodeColorIndex: Int
     let parentLanes: [Int]
+    let parentConnectorColorIndexes: [Int]
     let laneCount: Int
     let isMerge: Bool
     let hasIncomingLane: Bool
@@ -58,4 +62,5 @@ struct CommitGraphState: Hashable, Sendable {
 struct CommitGraphLaneMove: Hashable, Sendable {
     let fromLane: Int
     let toLane: Int
+    let colorIndex: Int
 }
