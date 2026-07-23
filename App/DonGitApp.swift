@@ -25,9 +25,18 @@ struct DonGitApp: App {
         }
         .windowStyle(.titleBar)
         .commands {
-            CommandGroup(replacing: .newItem) {}
+            CommandGroup(replacing: .newItem) {
+                Button("Add Repository…") {
+                    NotificationCenter.default.post(name: .addRepositoryRequested, object: nil)
+                }
+                .keyboardShortcut("o")
+            }
         }
     }
+}
+
+extension Notification.Name {
+    static let addRepositoryRequested = Notification.Name("addRepositoryRequested")
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {

@@ -13,6 +13,7 @@ final class GitViewerStore: ObservableObject {
     @Published var isLoadingRepositories = false
     @Published var isLoadingHistory = false
     @Published var errorMessage: String?
+    @Published private(set) var repositoryFolderColors: [GitRepository.ID: RepositoryFolderColor] = [:]
 
     private struct HistoryCacheEntry {
         let signature: String
@@ -24,6 +25,7 @@ final class GitViewerStore: ObservableObject {
     private let defaults: UserDefaults
     private let repositoryPathsKey = "repositoryPaths"
     private let selectedRepositoryPathKey = "selectedRepositoryPath"
+    private let repositoryFolderColorsKey = "repositoryFolderColors"
     private var historyCache: [GitRepository.ID: HistoryCacheEntry] = [:]
     private var hasLoadedInitialData = false
     private var autoRefreshTask: Task<Void, Never>?
@@ -33,6 +35,11 @@ final class GitViewerStore: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         selectedRepositoryID = defaults.string(forKey: selectedRepositoryPathKey)
+        let savedColors = defaults.dictionary(forKey: repositoryFolderColorsKey) as? [String: String] ?? [:]
+        repositoryFolderColors = savedColors.reduce(into: [:]) { result, entry in
+            guard let color = RepositoryFolderColor(rawValue: entry.value), color != .defaultColor else { return }
+            result[entry.key] = color
+        }
     }
 
     var selectedRepository: GitRepository? {
@@ -102,6 +109,8 @@ final class GitViewerStore: ObservableObject {
         defaults.set(paths, forKey: repositoryPathsKey)
         repositories.removeAll { $0.id == id }
         historyCache[id] = nil
+        repositoryFolderColors[id] = nil
+        persistRepositoryFolderColors()
 
         guard selectedRepositoryID == id else { return }
         selectedRepositoryID = repositories.first?.id
@@ -110,9 +119,23 @@ final class GitViewerStore: ObservableObject {
         await reloadSelectedHistory()
     }
 
+    func repositoryFolderColor(for id: GitRepository.ID) -> RepositoryFolderColor {
+        repositoryFolderColors[id] ?? .defaultColor
+    }
+
+    func setRepositoryFolderColor(_ color: RepositoryFolderColor, for id: GitRepository.ID) {
+        if color == .defaultColor {
+            repositoryFolderColors[id] = nil
+        } else {
+            repositoryFolderColors[id] = color
+        }
+        persistRepositoryFolderColors()
+    }
+
     func refreshFromActivation() async {
         guard hasLoadedInitialData else { return }
-        await refreshSilently()
+        await refreshRepositories(selectFirstIfNeeded: false, showsLoading: false)
+        await reloadSelectedHistory(showsLoading: false)
     }
 
     func commitAllChanges(message: String) async {
@@ -227,7 +250,6 @@ final class GitViewerStore: ObservableObject {
         isRefreshing = true
         defer { isRefreshing = false }
 
-        await refreshRepositories(selectFirstIfNeeded: false, showsLoading: false)
         await reloadSelectedHistory(showsLoading: false)
     }
 
@@ -245,6 +267,13 @@ final class GitViewerStore: ObservableObject {
         } else {
             defaults.removeObject(forKey: selectedRepositoryPathKey)
         }
+    }
+
+    private func persistRepositoryFolderColors() {
+        defaults.set(
+            repositoryFolderColors.mapValues(\.rawValue),
+            forKey: repositoryFolderColorsKey
+        )
     }
 }
 

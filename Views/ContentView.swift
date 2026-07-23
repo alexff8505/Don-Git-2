@@ -37,6 +37,9 @@ struct ContentView: View {
         } message: {
             Text(repositorySelectionError ?? "An unknown error occurred.")
         }
+        .onReceive(NotificationCenter.default.publisher(for: .addRepositoryRequested)) { _ in
+            chooseRepository()
+        }
     }
 
     private var repositorySelectionErrorBinding: Binding<Bool> {
@@ -89,8 +92,8 @@ private struct RepositoryStatusView: View {
                     .foregroundStyle(.primary)
                 }
 
-                Text("\(store.rows.count.formatted()) commits")
-                Text("Local Changes: (\(store.localChangesCount.formatted()))")
+                Text(commitCountText)
+                Text(localChangesText)
             }
             .font(.subheadline)
             .foregroundStyle(.secondary)
@@ -101,6 +104,16 @@ private struct RepositoryStatusView: View {
     private var branch: String? {
         guard store.currentBranch?.isEmpty == false else { return nil }
         return store.currentBranch
+    }
+
+    private var commitCountText: String {
+        let count = store.rows.count
+        return "\(count.formatted()) \(count == 1 ? "commit" : "commits")"
+    }
+
+    private var localChangesText: String {
+        let count = store.localChangesCount
+        return count == 0 ? "Clean" : "\(count.formatted()) \(count == 1 ? "change" : "changes")"
     }
 }
 

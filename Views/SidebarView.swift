@@ -9,10 +9,30 @@ struct SidebarView: View {
         List(selection: selectionBinding) {
             Section {
                 ForEach(sortedRepositories) { repository in
-                    RepositoryRow(repository: repository, showsUpdatedAt: repositorySortOrder == .updated)
+                    RepositoryRow(
+                        repository: repository,
+                        showsUpdatedAt: repositorySortOrder == .updated,
+                        folderColor: store.repositoryFolderColor(for: repository.id)
+                        )
                         .tag(repository.id)
                         .contextMenu {
-                            Button("Remove Repository", role: .destructive) {
+                            Picker(
+                                "Folder Colour",
+                                selection: repositoryFolderColorBinding(for: repository.id)
+                            ) {
+                                ForEach(RepositoryFolderColor.allCases) { color in
+                                    Label {
+                                        Text(color.title)
+                                    } icon: {
+                                        FolderColorSwatch(color: color)
+                                    }
+                                    .tag(color)
+                                }
+                            }
+
+                            Divider()
+
+                            Button("Remove from Sidebar") {
                                 Task {
                                     await store.removeRepository(repository.id)
                                 }
@@ -27,6 +47,7 @@ struct SidebarView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             sidebarControls
         }
+        .onDeleteCommand(perform: removeSelectedRepository)
         .overlay {
             if store.isLoadingRepositories && store.repositories.isEmpty {
                 ProgressView()
@@ -71,6 +92,14 @@ struct SidebarView: View {
         }
     }
 
+    private func repositoryFolderColorBinding(for id: GitRepository.ID) -> Binding<RepositoryFolderColor> {
+        Binding {
+            store.repositoryFolderColor(for: id)
+        } set: { color in
+            store.setRepositoryFolderColor(color, for: id)
+        }
+    }
+
     private var sidebarControls: some View {
         VStack(spacing: 0) {
             Divider()
@@ -84,17 +113,14 @@ struct SidebarView: View {
                 .help("Add repository")
 
                 Button {
-                    guard let selectedRepositoryID = store.selectedRepositoryID else { return }
-                    Task {
-                        await store.removeRepository(selectedRepositoryID)
-                    }
+                    removeSelectedRepository()
                 } label: {
                     Image(systemName: "minus")
                         .frame(width: 22, height: 22)
                 }
                 .buttonStyle(.borderless)
                 .disabled(store.selectedRepositoryID == nil)
-                .help("Remove selected repository")
+                .help("Remove selected repository from the sidebar")
 
                 Spacer()
 
@@ -126,6 +152,13 @@ struct SidebarView: View {
             Task {
                 await store.selectRepository(id)
             }
+        }
+    }
+
+    private func removeSelectedRepository() {
+        guard let selectedRepositoryID = store.selectedRepositoryID else { return }
+        Task {
+            await store.removeRepository(selectedRepositoryID)
         }
     }
 }
@@ -160,6 +193,7 @@ private enum RepositorySortOrder: String, CaseIterable, Identifiable {
 private struct RepositoryRow: View {
     let repository: GitRepository
     let showsUpdatedAt: Bool
+    let folderColor: RepositoryFolderColor
 
     var body: some View {
         Label {
@@ -173,8 +207,9 @@ private struct RepositoryRow: View {
             }
         } icon: {
             Image(systemName: "folder")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(folderColor.color ?? .secondary)
         }
+        .accessibilityValue("Folder colour: \(folderColor.title)")
     }
 
     private var detail: String {
@@ -183,5 +218,21 @@ private struct RepositoryRow: View {
         }
 
         return "\(DisplayFormatters.repositoryUpdatedDate(updatedAt))  \(repository.displayPath)"
+    }
+}
+
+private struct FolderColorSwatch: View {
+    let color: RepositoryFolderColor
+
+    var body: some View {
+        if let swatch = color.color {
+            Circle()
+                .fill(swatch)
+                .frame(width: 9, height: 9)
+        } else {
+            Circle()
+                .stroke(.secondary, lineWidth: 1)
+                .frame(width: 9, height: 9)
+        }
     }
 }
