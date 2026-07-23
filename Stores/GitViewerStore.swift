@@ -21,11 +21,19 @@ final class GitViewerStore: ObservableObject {
     }
 
     private let gitClient = GitClient()
+    private let defaults: UserDefaults
+    private let repositoryPathsKey = "repositoryPaths"
+    private let selectedRepositoryPathKey = "selectedRepositoryPath"
     private var historyCache: [GitRepository.ID: HistoryCacheEntry] = [:]
     private var hasLoadedInitialData = false
     private var autoRefreshTask: Task<Void, Never>?
     private var isRefreshing = false
     private var historyLoadGeneration = 0
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        selectedRepositoryID = defaults.string(forKey: selectedRepositoryPathKey)
+    }
 
     var selectedRepository: GitRepository? {
         guard let selectedRepositoryID else { return nil }
@@ -59,6 +67,45 @@ final class GitViewerStore: ObservableObject {
     func selectRepository(_ id: GitRepository.ID?) async {
         guard selectedRepositoryID != id else { return }
         selectedRepositoryID = id
+        persistSelectedRepository()
+        selectedCommitID = nil
+        await reloadSelectedHistory()
+    }
+
+    func addRepository(at selectedURL: URL) async throws {
+        let selectedPath = selectedURL.path
+        let repository = await Task.detached(priority: .userInitiated) {
+            GitRepositoryScanner().repository(at: URL(fileURLWithPath: selectedPath))
+        }.value
+
+        guard let repository else {
+            throw RepositorySelectionError.notGitRepository
+        }
+
+        var paths = configuredRepositoryPaths
+        if !paths.contains(repository.id) {
+            paths.append(repository.id)
+            defaults.set(paths, forKey: repositoryPathsKey)
+        }
+
+        if let index = repositories.firstIndex(where: { $0.id == repository.id }) {
+            repositories[index] = repository
+        } else {
+            repositories.append(repository)
+        }
+
+        await selectRepository(repository.id)
+    }
+
+    func removeRepository(_ id: GitRepository.ID) async {
+        let paths = configuredRepositoryPaths.filter { $0 != id }
+        defaults.set(paths, forKey: repositoryPathsKey)
+        repositories.removeAll { $0.id == id }
+        historyCache[id] = nil
+
+        guard selectedRepositoryID == id else { return }
+        selectedRepositoryID = repositories.first?.id
+        persistSelectedRepository()
         selectedCommitID = nil
         await reloadSelectedHistory()
     }
@@ -95,14 +142,16 @@ final class GitViewerStore: ObservableObject {
             }
         }
 
+        let paths = configuredRepositoryPaths
         let found = await Task.detached(priority: .userInitiated) {
-            GitRepositoryScanner().repositories()
+            GitRepositoryScanner().repositories(at: paths)
         }.value
 
         repositories = found
 
         if let selectedRepositoryID, !found.contains(where: { $0.id == selectedRepositoryID }) {
             self.selectedRepositoryID = nil
+            persistSelectedRepository()
             rows = []
             selectedCommitID = nil
             currentBranch = nil
@@ -111,6 +160,7 @@ final class GitViewerStore: ObservableObject {
 
         if selectedRepositoryID == nil, selectFirstIfNeeded {
             selectedRepositoryID = found.first?.id
+            persistSelectedRepository()
         }
     }
 
@@ -121,7 +171,8 @@ final class GitViewerStore: ObservableObject {
             selectedCommitID = nil
             currentBranch = nil
             localChangesCount = 0
-            errorMessage = repositories.isEmpty ? "No git repositories were found in ~/Sites." : nil
+            isLoadingHistory = false
+            errorMessage = nil
             return
         }
 
@@ -182,5 +233,28 @@ final class GitViewerStore: ObservableObject {
 
     private func isCurrentHistoryLoad(_ generation: Int, repositoryID: GitRepository.ID) -> Bool {
         historyLoadGeneration == generation && selectedRepositoryID == repositoryID
+    }
+
+    private var configuredRepositoryPaths: [String] {
+        defaults.stringArray(forKey: repositoryPathsKey) ?? []
+    }
+
+    private func persistSelectedRepository() {
+        if let selectedRepositoryID {
+            defaults.set(selectedRepositoryID, forKey: selectedRepositoryPathKey)
+        } else {
+            defaults.removeObject(forKey: selectedRepositoryPathKey)
+        }
+    }
+}
+
+enum RepositorySelectionError: LocalizedError {
+    case notGitRepository
+
+    var errorDescription: String? {
+        switch self {
+        case .notGitRepository:
+            "The selected folder is not inside a Git repository."
+        }
     }
 }

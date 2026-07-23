@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SidebarView: View {
     @ObservedObject var store: GitViewerStore
+    let onAddRepository: () -> Void
     @AppStorage("repositorySortOrder") private var repositorySortOrderRaw = RepositorySortOrder.name.rawValue
 
     var body: some View {
@@ -10,31 +11,22 @@ struct SidebarView: View {
                 ForEach(sortedRepositories) { repository in
                     RepositoryRow(repository: repository, showsUpdatedAt: repositorySortOrder == .updated)
                         .tag(repository.id)
-                }
-            } header: {
-                HStack {
-                    Text("Repositories")
-
-                    Spacer()
-
-                    Menu {
-                        Picker("Sort Repositories", selection: repositorySortOrderBinding) {
-                            ForEach(RepositorySortOrder.allCases) { sortOrder in
-                                Label(sortOrder.title, systemImage: sortOrder.systemImage)
-                                    .tag(sortOrder)
+                        .contextMenu {
+                            Button("Remove Repository", role: .destructive) {
+                                Task {
+                                    await store.removeRepository(repository.id)
+                                }
                             }
                         }
-                    } label: {
-                        Label("Sort Repositories", systemImage: repositorySortOrder.systemImage)
-                            .labelStyle(.iconOnly)
-                    }
-                    .menuStyle(.borderlessButton)
-                    .controlSize(.small)
-                    .help("Sort repositories")
                 }
+            } header: {
+                Text("Repositories")
             }
         }
         .listStyle(.sidebar)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            sidebarControls
+        }
         .overlay {
             if store.isLoadingRepositories && store.repositories.isEmpty {
                 ProgressView()
@@ -76,6 +68,54 @@ struct SidebarView: View {
             repositorySortOrder
         } set: { newValue in
             repositorySortOrderRaw = newValue.rawValue
+        }
+    }
+
+    private var sidebarControls: some View {
+        VStack(spacing: 0) {
+            Divider()
+
+            HStack(spacing: 2) {
+                Button(action: onAddRepository) {
+                    Image(systemName: "plus")
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.borderless)
+                .help("Add repository")
+
+                Button {
+                    guard let selectedRepositoryID = store.selectedRepositoryID else { return }
+                    Task {
+                        await store.removeRepository(selectedRepositoryID)
+                    }
+                } label: {
+                    Image(systemName: "minus")
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.borderless)
+                .disabled(store.selectedRepositoryID == nil)
+                .help("Remove selected repository")
+
+                Spacer()
+
+                Menu {
+                    Picker("Sort By", selection: repositorySortOrderBinding) {
+                        ForEach(RepositorySortOrder.allCases) { sortOrder in
+                            Label(sortOrder.title, systemImage: sortOrder.systemImage)
+                                .tag(sortOrder)
+                        }
+                    }
+                } label: {
+                    Label("Sort", systemImage: "arrow.up.arrow.down")
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help("Sort repositories")
+            }
+            .controlSize(.small)
+            .padding(.horizontal, 8)
+            .frame(height: 34)
+            .background(.bar)
         }
     }
 

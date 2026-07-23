@@ -1,18 +1,20 @@
+import AppKit
 import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var store: GitViewerStore
     @State private var isShowingCommitSheet = false
+    @State private var repositorySelectionError: String?
 
     var body: some View {
         NavigationSplitView {
-            SidebarView(store: store)
+            SidebarView(store: store, onAddRepository: chooseRepository)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 360)
         } detail: {
-            RepositoryHistoryView(store: store)
+            RepositoryHistoryView(store: store, onAddRepository: chooseRepository)
         }
         .navigationTitle(store.selectedRepository?.name ?? "DonGit")
-        .navigationSubtitle(store.selectedRepository == nil ? "Git repositories in ~/Sites" : "")
+        .navigationSubtitle(store.selectedRepository == nil ? "Add a Git repository to begin" : "")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 RepositoryStatusView(store: store)
@@ -29,6 +31,44 @@ struct ContentView: View {
         }
         .sheet(isPresented: $isShowingCommitSheet) {
             CommitSheet(store: store, isPresented: $isShowingCommitSheet)
+        }
+        .alert("Unable to Add Repository", isPresented: repositorySelectionErrorBinding) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(repositorySelectionError ?? "An unknown error occurred.")
+        }
+    }
+
+    private var repositorySelectionErrorBinding: Binding<Bool> {
+        Binding {
+            repositorySelectionError != nil
+        } set: { isPresented in
+            if !isPresented {
+                repositorySelectionError = nil
+            }
+        }
+    }
+
+    private func chooseRepository() {
+        let panel = NSOpenPanel()
+        panel.title = "Add Git Repository"
+        panel.message = "Choose a Git repository folder."
+        panel.prompt = "Add"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = false
+
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+
+            Task { @MainActor in
+                do {
+                    try await store.addRepository(at: url)
+                } catch {
+                    repositorySelectionError = error.localizedDescription
+                }
+            }
         }
     }
 }
