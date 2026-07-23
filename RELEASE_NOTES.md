@@ -1,6 +1,6 @@
 # Release Notes
 
-## Unreleased — 24 July 2026
+## 1.1 — 24 July 2026
 
 ### Repository management
 
