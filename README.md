@@ -16,8 +16,6 @@ Don Git 2 is a native macOS Git history viewer for local repositories. It uses S
 
 The repository picker uses the standard macOS open panel and accepts any folder inside a Git working tree.
 
-![The native macOS panel used to add a repository](Docs/Screenshots/add-repository.png)
-
 ## Requirements
 
 - macOS 15 or later
