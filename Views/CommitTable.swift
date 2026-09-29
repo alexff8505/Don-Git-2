@@ -12,37 +12,38 @@ struct CommitTable: View {
                     .offset(y: -CommitTableMetrics.graphVerticalBleed)
                     .frame(height: rowHeight(for: row), alignment: .top)
             }
-            .width(min: 42, ideal: 140, max: 2_000)
+            .width(min: 42, ideal: 96, max: 2_000)
 
             TableColumn("Commit") { row in
                 CommitSummaryCell(row: row)
             }
-            .width(min: 160, ideal: 680, max: 3_000)
+            .width(min: 160, ideal: 420, max: 3_000)
 
             TableColumn("Hash") { row in
                 Text(row.commit.shortHash)
-                    .font(.system(.body, design: .monospaced))
+                    .font(.system(.callout, design: .monospaced))
                     .lineLimit(1)
             }
             .width(min: 60, ideal: 96, max: 400)
 
             TableColumn("Author") { row in
                 HStack(spacing: 6) {
-                    Image(systemName: "person.crop.square.fill")
+                    Image(systemName: "person")
                         .foregroundStyle(.secondary)
                         .imageScale(.small)
+                        .accessibilityHidden(true)
                     Text(row.commit.authorName)
                         .lineLimit(1)
                 }
                 .font(.callout)
             }
-            .width(min: 80, ideal: 170, max: 1_000)
+            .width(min: 80, ideal: 140, max: 1_000)
 
             TableColumn("Date") { row in
                 Text(DisplayFormatters.commitDate(row.commit.authoredAt))
                     .lineLimit(1)
             }
-            .width(min: 100, ideal: 178, max: 1_000)
+            .width(min: 100, ideal: 164, max: 1_000)
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
         .background(CommitTableColumnPersistence())
@@ -65,7 +66,7 @@ private struct CommitSummaryCell: View {
     var body: some View {
         GeometryReader { proxy in
             VStack(alignment: .leading, spacing: 2) {
-                Text(row.commit.subject)
+                Text(row.commit.subject.isEmpty ? "Untitled commit" : row.commit.subject)
                     .lineLimit(1)
                     .foregroundStyle(row.commit.subject.isEmpty ? .secondary : .primary)
                 HStack(spacing: 5) {
@@ -87,7 +88,7 @@ private struct RefBadgeView: View {
     var body: some View {
         HStack(spacing: 0) {
             if badge.kind == .currentBranch {
-                Text("HEAD").foregroundStyle(.cyan)
+                Text("HEAD")
                 Text(" → ").foregroundStyle(.secondary)
             }
             Text(badge.kind == .tag ? "tag: \(badge.name)" : badge.name)
@@ -96,36 +97,25 @@ private struct RefBadgeView: View {
         .font(.caption2.weight(.semibold))
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
-        .foregroundStyle(style.foreground)
-        .background(.thinMaterial, in: Capsule())
-        .background(style.tint.opacity(0.18), in: Capsule())
+        .foregroundStyle(.primary)
+        .background(tint.opacity(0.18), in: Capsule())
         .overlay {
             Capsule()
-                .stroke(style.border, lineWidth: 0.75)
+                .stroke(tint.opacity(0.42), lineWidth: 0.75)
         }
-        .shadow(color: .black.opacity(0.08), radius: 0.5, y: 0.5)
         .fixedSize(horizontal: true, vertical: false)
     }
 
-    private var style: RefBadgeStyle {
+    private var tint: Color {
         switch badge.kind {
         case .head:
-            return RefBadgeStyle(foreground: .cyan, tint: .cyan)
+            .cyan
         case .currentBranch, .branch:
-            return RefBadgeStyle(foreground: .green, tint: .green)
+            .green
         case .remote:
-            return RefBadgeStyle(foreground: .red, tint: .red)
+            .red
         case .tag:
-            return RefBadgeStyle(foreground: .yellow, tint: .yellow)
+            .yellow
         }
-    }
-}
-
-private struct RefBadgeStyle {
-    let foreground: Color
-    let tint: Color
-
-    var border: Color {
-        tint.opacity(0.42)
     }
 }

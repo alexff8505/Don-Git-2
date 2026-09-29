@@ -20,10 +20,10 @@ struct DonGitApp: App {
                         await store.refreshFromActivation()
                     }
                 }
-                .containerBackground(.ultraThinMaterial, for: .window)
                 .frame(minWidth: 980, minHeight: 620)
         }
         .windowStyle(.titleBar)
+        .defaultSize(width: 1_240, height: 780)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("Add Repository…") {
@@ -31,11 +31,19 @@ struct DonGitApp: App {
                 }
                 .keyboardShortcut("o")
             }
+            CommandGroup(after: .newItem) {
+                Button("Refresh History") {
+                    NotificationCenter.default.post(name: .refreshHistoryRequested, object: nil)
+                }
+                .keyboardShortcut("r")
+                .disabled(store.selectedRepository == nil || store.isLoadingHistory || store.isCommitting)
+            }
         }
     }
 }
 
 extension Notification.Name {
+    static let refreshHistoryRequested = Notification.Name("refreshHistoryRequested")
     static let addRepositoryRequested = Notification.Name("addRepositoryRequested")
 }
 
