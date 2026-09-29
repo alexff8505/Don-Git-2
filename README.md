@@ -11,8 +11,9 @@ Don Git 2 is a native macOS Git history viewer for local repositories. It uses S
 - Assign a persistent colour to each repository folder from its right-click menu.
 - Sort repositories by name or most recent commit date.
 - View all branches and refs in a topological commit graph.
-- See the current branch, commit count, and working-tree status in the toolbar.
-- Stage and commit all local changes with a commit message.
+- See the current branch, commit count, and working-tree status in the bottom status bar.
+- Refresh history with the native toolbar action or **File → Refresh History** (`⌘R`).
+- Stage and commit all local changes with a multiline commit message (`⌘Return` in the commit sheet).
 
 The repository picker uses the standard macOS open panel and accepts any folder inside a Git working tree.
 

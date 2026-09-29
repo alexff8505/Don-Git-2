@@ -4,29 +4,50 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var store: GitViewerStore
     @State private var isShowingCommitSheet = false
+    @State private var isRefreshing = false
     @State private var repositorySelectionError: String?
 
     var body: some View {
         NavigationSplitView {
             SidebarView(store: store, onAddRepository: chooseRepository)
+                .frame(minWidth: 220)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 360)
+                .toolbar(removing: .sidebarToggle)
         } detail: {
             RepositoryHistoryView(store: store, onAddRepository: chooseRepository)
         }
-        .navigationTitle(store.selectedRepository?.name ?? "DonGit")
-        .navigationSubtitle(store.selectedRepository == nil ? "Add a Git repository to begin" : "")
+        .navigationTitle(store.selectedRepository?.name ?? "Don Git 2")
+        .navigationSubtitle(store.selectedRepository?.displayPath ?? "Local Git repositories")
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                RepositoryStatusView(store: store)
-                    .padding(.leading, 8)
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    refreshHistory()
+                } label: {
+                    if isRefreshing {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Label("Refresh History", systemImage: "arrow.clockwise")
+                    }
+                }
+                .disabled(store.selectedRepository == nil || store.isLoadingHistory || store.isCommitting || isRefreshing)
+                .accessibilityLabel("Refresh History")
+                .help("Refresh history (⌘R)")
+            }
 
+            if #available(macOS 26.0, *) {
+                ToolbarSpacer(.fixed, placement: .primaryAction)
+            }
+
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     isShowingCommitSheet = true
                 } label: {
-                    CommitStatusIcon(localChangesCount: store.localChangesCount)
+                    Label("Commit…", systemImage: "square.and.pencil")
                 }
-                .disabled(store.selectedRepository == nil || store.localChangesCount == 0 || store.isCommitting)
+                .disabled(store.selectedRepository == nil || store.localChangesCount == 0 || store.isLoadingHistory || store.isCommitting)
                 .help("Commit all local changes")
+                .accessibilityValue("\(store.localChangesCount) local changes")
             }
         }
         .sheet(isPresented: $isShowingCommitSheet) {
@@ -40,6 +61,9 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .addRepositoryRequested)) { _ in
             chooseRepository()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .refreshHistoryRequested)) { _ in
+            refreshHistory()
+        }
     }
 
     private var repositorySelectionErrorBinding: Binding<Bool> {
@@ -49,6 +73,15 @@ struct ContentView: View {
             if !isPresented {
                 repositorySelectionError = nil
             }
+        }
+    }
+
+    private func refreshHistory() {
+        guard store.selectedRepository != nil, !store.isLoadingHistory, !store.isCommitting, !isRefreshing else { return }
+        isRefreshing = true
+        Task {
+            defer { isRefreshing = false }
+            await store.refreshFromActivation()
         }
     }
 
@@ -76,116 +109,106 @@ struct ContentView: View {
     }
 }
 
-private struct RepositoryStatusView: View {
-    @ObservedObject var store: GitViewerStore
-
-    var body: some View {
-        if store.selectedRepository != nil {
-            HStack(spacing: 10) {
-                if let branch {
-                    HStack(spacing: 5) {
-                        Image(systemName: "arrow.triangle.branch")
-                            .imageScale(.small)
-                        Text(branch)
-                    }
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(.primary)
-                }
-
-                Text(commitCountText)
-                Text(localChangesText)
-            }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-        }
-    }
-
-    private var branch: String? {
-        guard store.currentBranch?.isEmpty == false else { return nil }
-        return store.currentBranch
-    }
-
-    private var commitCountText: String {
-        let count = store.rows.count
-        return "\(count.formatted()) \(count == 1 ? "commit" : "commits")"
-    }
-
-    private var localChangesText: String {
-        let count = store.localChangesCount
-        return count == 0 ? "Clean" : "\(count.formatted()) \(count == 1 ? "change" : "changes")"
-    }
-}
-
-private struct CommitStatusIcon: View {
-    let localChangesCount: Int
-
-    var body: some View {
-        Label {
-            Text("Commit")
-        } icon: {
-            Image(systemName: "checkmark.circle")
-                .imageScale(.large)
-                .frame(width: 24, height: 22)
-                .overlay(alignment: .topTrailing) {
-                    if localChangesCount > 0 {
-                        Text(badgeText)
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.white)
-                            .monospacedDigit()
-                            .padding(.horizontal, localChangesCount < 10 ? 0 : 4)
-                            .frame(minWidth: 15, minHeight: 15)
-                            .background(.red, in: Capsule())
-                            .offset(x: 6, y: -6)
-                    }
-                }
-        }
-        .accessibilityValue("\(localChangesCount) local changes")
-    }
-
-    private var badgeText: String {
-        localChangesCount > 99 ? "99+" : localChangesCount.formatted()
-    }
-}
-
 private struct CommitSheet: View {
     @ObservedObject var store: GitViewerStore
     @Binding var isPresented: Bool
     @State private var message = ""
+    @State private var commitError: String?
+    @State private var isSubmitting = false
+    @FocusState private var isMessageFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Commit All Local Changes")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 20) {
+            HStack(spacing: 12) {
+                Image(systemName: "square.and.pencil")
+                    .font(.largeTitle)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.tint)
+                    .accessibilityHidden(true)
 
-            TextField("Commit message", text: $message)
-                .textFieldStyle(.roundedBorder)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Commit Changes")
+                        .font(.title2.weight(.semibold))
+                    Text(store.selectedRepository?.name ?? "Repository")
+                        .foregroundStyle(.secondary)
+                }
+            }
 
-            Text("\(store.localChangesCount.formatted()) local changes will be staged and committed.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Commit message")
+                    .font(.headline)
+                TextEditor(text: $message)
+                    .font(.body)
+                    .scrollContentBackground(.hidden)
+                    .padding(6)
+                    .frame(height: 100)
+                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
+                    }
+                    .focused($isMessageFocused)
+                    .disabled(isSubmitting)
+                    .accessibilityLabel("Commit message")
+                    .accessibilityHint("Describe your changes. Press Command Return to commit.")
+
+                Text(store.localChangesCount == 1
+                     ? "1 local change will be staged and committed."
+                     : "All \(store.localChangesCount.formatted()) local changes will be staged and committed.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let commitError {
+                Label {
+                    Text(commitError)
+                        .textSelection(.enabled)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle")
+                }
+                .font(.callout)
+                .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
+            }
 
             HStack {
+                if isSubmitting {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Committing…")
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
 
                 Button("Cancel") {
                     isPresented = false
                 }
                 .keyboardShortcut(.cancelAction)
+                .disabled(isSubmitting)
 
                 Button("Commit") {
+                    guard !isSubmitting else { return }
+                    isSubmitting = true
+                    commitError = nil
                     Task {
+                        defer { isSubmitting = false }
                         await store.commitAllChanges(message: message)
-                        if store.errorMessage == nil {
+                        if let error = store.errorMessage {
+                            commitError = error
+                        } else {
                             isPresented = false
                         }
                     }
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || store.isCommitting)
+                .keyboardShortcut(.return, modifiers: .command)
+                .buttonStyle(.borderedProminent)
+                .help("Commit changes (⌘Return)")
+                .disabled(message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || store.localChangesCount == 0 || isSubmitting || store.isCommitting)
             }
         }
-        .padding()
-        .frame(width: 380)
+        .padding(24)
+        .frame(width: 460)
+        .interactiveDismissDisabled(isSubmitting)
+        .onAppear { isMessageFocused = true }
     }
 }

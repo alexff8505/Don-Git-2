@@ -13,7 +13,7 @@ struct SidebarView: View {
                         repository: repository,
                         showsUpdatedAt: repositorySortOrder == .updated,
                         folderColor: store.repositoryFolderColor(for: repository.id)
-                        )
+                    )
                         .tag(repository.id)
                         .contextMenu {
                             Picker(
@@ -107,19 +107,21 @@ struct SidebarView: View {
             HStack(spacing: 2) {
                 Button(action: onAddRepository) {
                     Image(systemName: "plus")
-                        .frame(width: 22, height: 22)
+                        .frame(width: 28, height: 28)
                 }
                 .buttonStyle(.borderless)
-                .help("Add repository")
+                .accessibilityLabel("Add Repository")
+                .help("Add repository (⌘O)")
 
                 Button {
                     removeSelectedRepository()
                 } label: {
                     Image(systemName: "minus")
-                        .frame(width: 22, height: 22)
+                        .frame(width: 28, height: 28)
                 }
                 .buttonStyle(.borderless)
                 .disabled(store.selectedRepositoryID == nil)
+                .accessibilityLabel("Remove from Sidebar")
                 .help("Remove selected repository from the sidebar")
 
                 Spacer()
@@ -139,8 +141,8 @@ struct SidebarView: View {
                 .help("Sort repositories")
             }
             .controlSize(.small)
-            .padding(.horizontal, 8)
-            .frame(height: 34)
+            .padding(.horizontal, 10)
+            .frame(height: 44)
             .background(.bar)
         }
     }
@@ -197,8 +199,9 @@ private struct RepositoryRow: View {
 
     var body: some View {
         Label {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(repository.name)
+                    .font(.body.weight(.medium))
                     .lineLimit(1)
                 Text(detail)
                     .font(.caption)
@@ -206,10 +209,14 @@ private struct RepositoryRow: View {
                     .lineLimit(1)
             }
         } icon: {
-            Image(systemName: "folder")
+            Image(systemName: "folder.fill")
+                .font(.title3)
+                .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(folderColor.color ?? .secondary)
         }
-        .accessibilityValue("Folder colour: \(folderColor.title)")
+        .padding(.vertical, 4)
+        .help(repository.path.path)
+        .accessibilityValue("\(repository.displayPath). Folder colour: \(folderColor.title)")
     }
 
     private var detail: String {
@@ -217,7 +224,7 @@ private struct RepositoryRow: View {
             return repository.displayPath
         }
 
-        return "\(DisplayFormatters.repositoryUpdatedDate(updatedAt))  \(repository.displayPath)"
+        return DisplayFormatters.repositoryUpdatedDate(updatedAt)
     }
 }
 
