@@ -47,6 +47,12 @@ final class GitViewerStore: ObservableObject {
         return repositories.first { $0.id == selectedRepositoryID }
     }
 
+    func moveCommit(_ direction: Int) {
+        guard !rows.isEmpty else { return }
+        let current = rows.firstIndex { $0.id == selectedCommitID } ?? (direction > 0 ? -1 : rows.count)
+        selectedCommitID = rows[min(max(current + direction, 0), rows.count - 1)].id
+    }
+
     func loadInitialData() async {
         guard !hasLoadedInitialData else { return }
         hasLoadedInitialData = true

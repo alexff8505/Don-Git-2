@@ -3,6 +3,7 @@ import SwiftUI
 struct SidebarView: View {
     @ObservedObject var store: GitViewerStore
     let onAddRepository: () -> Void
+    @FocusState private var hasKeyboardFocus: Bool
     @AppStorage("repositorySortOrder") private var repositorySortOrderRaw = RepositorySortOrder.name.rawValue
 
     var body: some View {
@@ -44,6 +45,13 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .focused($hasKeyboardFocus)
+        .simultaneousGesture(TapGesture().onEnded {
+            hasKeyboardFocus = true
+        })
+        .onReceive(NotificationCenter.default.publisher(for: .focusRepositories)) { _ in
+            hasKeyboardFocus = true
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             sidebarControls
         }

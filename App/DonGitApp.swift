@@ -38,13 +38,59 @@ struct DonGitApp: App {
                 .keyboardShortcut("r")
                 .disabled(store.selectedRepository == nil || store.isLoadingHistory || store.isCommitting)
             }
+            CommandMenu("Navigate") {
+                Button("Focus Repositories") {
+                    NotificationCenter.default.post(name: .focusRepositories, object: nil)
+                }
+                .keyboardShortcut("0")
+                .disabled(store.repositories.isEmpty)
+                Button("Focus Commit History") {
+                    NotificationCenter.default.post(name: .focusCommitHistory, object: nil)
+                }
+                .keyboardShortcut("1")
+                .disabled(store.rows.isEmpty || store.isLoadingHistory)
+                Button("Focus Changed Files") {
+                    NotificationCenter.default.post(name: .focusChangedFiles, object: nil)
+                }
+                .keyboardShortcut("2")
+                .disabled(store.selectedCommitID == nil)
+                Button("Focus Code Diff") {
+                    NotificationCenter.default.post(name: .focusCodeDiff, object: nil)
+                }
+                .keyboardShortcut("3")
+                .disabled(store.selectedCommitID == nil)
+                Divider()
+                Button("Previous Commit") { store.moveCommit(-1) }
+                    .keyboardShortcut(.upArrow, modifiers: [.command, .control])
+                    .disabled(store.rows.isEmpty || store.isLoadingHistory)
+                Button("Next Commit") { store.moveCommit(1) }
+                    .keyboardShortcut(.downArrow, modifiers: [.command, .control])
+                    .disabled(store.rows.isEmpty || store.isLoadingHistory)
+                Divider()
+                Button("Previous Changed File") {
+                    NotificationCenter.default.post(name: .navigateChangedFile, object: -1)
+                }
+                .keyboardShortcut(.upArrow, modifiers: [.command, .option])
+                .disabled(store.selectedCommitID == nil)
+                Button("Next Changed File") {
+                    NotificationCenter.default.post(name: .navigateChangedFile, object: 1)
+                }
+                .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+                .disabled(store.selectedCommitID == nil)
+                Divider()
+                Button("Previous Change") {
+                    NotificationCenter.default.post(name: .navigateDiffChange, object: -1)
+                }
+                .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+                .disabled(store.selectedCommitID == nil)
+                Button("Next Change") {
+                    NotificationCenter.default.post(name: .navigateDiffChange, object: 1)
+                }
+                .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+                .disabled(store.selectedCommitID == nil)
+            }
         }
     }
-}
-
-extension Notification.Name {
-    static let refreshHistoryRequested = Notification.Name("refreshHistoryRequested")
-    static let addRepositoryRequested = Notification.Name("addRepositoryRequested")
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {

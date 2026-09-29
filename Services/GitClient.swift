@@ -66,6 +66,35 @@ struct GitClient: Sendable {
         }.value
     }
 
+    func loadChanges(repository: GitRepository, commit: GitCommit, parent: String?) async throws -> CommitChanges {
+        try await Task.detached(priority: .userInitiated) {
+            // Computing the empty tree rather than hard-coding it also supports SHA-256 repositories.
+            let base = try parent ?? runGit(["hash-object", "-t", "tree", "/dev/null"], in: repository.path)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let common = ["diff", "--no-ext-diff", "--no-textconv", "--no-color", "--ignore-submodules=none", "-M"]
+            let status = try runGit(common + ["--name-status", "-z", base, commit.hash, "--"], in: repository.path)
+            let stats = try runGit(common + ["--numstat", "-z", base, commit.hash, "--"], in: repository.path)
+            let message = try runGit(["show", "-s", "--format=%B", commit.hash], in: repository.path)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return CommitChanges(baseRevision: base,
+                                 files: try GitDiffParser.files(statusOutput: status, statOutput: stats), message: message)
+        }.value
+    }
+
+    func loadDiff(repository: GitRepository, commit: GitCommit, base: String, file: CommitChangedFile) async throws -> FileDiff {
+        try await Task.detached(priority: .userInitiated) {
+            var paths = [file.path]
+            if let previous = file.previousPath, previous != file.path { paths.insert(previous, at: 0) }
+            // Literal pathspecs keep names with brackets, wildcards, or leading colons exact.
+            let patch = try runGit([
+                "diff", "--no-ext-diff", "--no-textconv", "--no-color", "--ignore-submodules=none", "--submodule=short",
+                "--patch", "--raw", "-z", "-M", "--unified=3",
+                base, commit.hash, "--"
+            ] + paths.map { ":(literal)" + $0 }, in: repository.path)
+            return GitDiffParser.diff(try GitDiffParser.patch(for: file.path, in: patch))
+        }.value
+    }
+
     private func loadHistorySync(repository: GitRepository) throws -> [CommitRow] {
         let hasCommits = (try? runGit(["rev-parse", "--verify", "HEAD"], in: repository.path)) != nil
         guard hasCommits else { return [] }

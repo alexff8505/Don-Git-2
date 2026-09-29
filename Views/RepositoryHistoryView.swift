@@ -41,10 +41,22 @@ struct RepositoryHistoryView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                CommitTable(
-                    rows: store.rows,
-                    selectedCommitID: $store.selectedCommitID
-                )
+                NativeSplitView(isVertical: false, initialFirstSize: 0.4, minimumFirstSize: 150, minimumSecondSize: 240) {
+                    CommitTable(rows: store.rows, selectedCommitID: $store.selectedCommitID)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } second: {
+                    if let repository = store.selectedRepository,
+                       let commit = store.rows.first(where: { $0.id == store.selectedCommitID })?.commit {
+                        CommitChangesView(repository: repository, commit: commit)
+                            .id(repository.id + ":" + commit.hash)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ContentUnavailableView("Select a Commit", systemImage: "doc.text.magnifyingglass",
+                                               description: Text("Choose a commit to view its changed files and code."))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .background(.background)

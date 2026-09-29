@@ -18,14 +18,16 @@ APP_BINARY="$APP_MACOS/$EXECUTABLE_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 APP_ICON="$ROOT_DIR/Assets/AppIcon.icns"
 
-export HOME="$ROOT_DIR/.home"
 export CLANG_MODULE_CACHE_PATH="$ROOT_DIR/.build/ModuleCache"
 export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
 
-pkill -x "$EXECUTABLE_NAME" >/dev/null 2>&1 || true
+BUILD_OPTIONS=(--disable-sandbox --cache-path "$ROOT_DIR/.build/cache" --config-path "$ROOT_DIR/.build/config" --security-path "$ROOT_DIR/.build/security")
+swift build "${BUILD_OPTIONS[@]}"
+BUILD_BINARY="$(swift build "${BUILD_OPTIONS[@]}" --show-bin-path)/$EXECUTABLE_NAME"
 
-swift build
-BUILD_BINARY="$(swift build --show-bin-path)/$EXECUTABLE_NAME"
+if [[ "$MODE" != "--build" && "$MODE" != "build" ]]; then
+  pkill -x "$EXECUTABLE_NAME" >/dev/null 2>&1 || true
+fi
 
 rm -rf "$APP_BUNDLE" "$LEGACY_APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES"
@@ -63,6 +65,8 @@ open_app() {
 }
 
 case "$MODE" in
+  --build|build)
+    ;;
   run)
     open_app
     ;;
@@ -83,7 +87,7 @@ case "$MODE" in
     pgrep -x "$EXECUTABLE_NAME" >/dev/null
     ;;
   *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    echo "usage: $0 [run|--build|--debug|--logs|--telemetry|--verify]" >&2
     exit 2
     ;;
 esac

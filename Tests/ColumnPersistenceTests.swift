@@ -34,6 +34,21 @@ struct ColumnPersistenceTests {
         precondition(reopened.tableColumns[1].width == 803)
         restored.connect(to: reopened)
         precondition(reopened.tableColumns[0].width == 246)
+        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 800, height: 120))
+        let source = ColumnTestRows()
+        reopened.dataSource = source
+        reopened.rowHeight = 20
+        reopened.frame = NSRect(x: 0, y: 0, width: 800, height: 1_200)
+        scroll.documentView = reopened
+        reopened.reloadData()
+        restored.requestSelectionReveal(50)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        precondition(scroll.contentView.bounds.origin.y > 0, "Keyboard selection must scroll into view")
         print("Passed native resize configuration, width saving, and restoration checks.")
     }
+}
+
+@MainActor
+private final class ColumnTestRows: NSObject, NSTableViewDataSource {
+    func numberOfRows(in tableView: NSTableView) -> Int { 60 }
 }

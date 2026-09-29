@@ -3,6 +3,7 @@ import SwiftUI
 struct CommitTable: View {
     let rows: [CommitRow]
     @Binding var selectedCommitID: CommitRow.ID?
+    @FocusState private var hasKeyboardFocus: Bool
 
     var body: some View {
         Table(rows, selection: $selectedCommitID) {
@@ -46,7 +47,14 @@ struct CommitTable: View {
             .width(min: 100, ideal: 164, max: 1_000)
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
-        .background(CommitTableColumnPersistence())
+        .background(CommitTableColumnPersistence(selectedRowIndex: rows.firstIndex { $0.id == selectedCommitID }))
+        .focused($hasKeyboardFocus)
+        .simultaneousGesture(TapGesture().onEnded {
+            hasKeyboardFocus = true
+        })
+        .onReceive(NotificationCenter.default.publisher(for: .focusCommitHistory)) { _ in
+            hasKeyboardFocus = true
+        }
     }
 
     private func rowHeight(for row: CommitRow) -> CGFloat {

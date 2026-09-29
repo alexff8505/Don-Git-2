@@ -2,6 +2,12 @@
 
 ## Unreleased — macOS visual polish
 
+- Added a resizable commit-details pane with changed-file selection, full commit messages, and addition/deletion counts.
+- Added native selectable unified and aligned side-by-side code diffs, synchronised vertical scrolling, and clear binary/metadata-only states.
+- Added parent selection for merge comparisons and empty-tree comparison for root commits.
+- Added a Navigate menu with keyboard shortcuts for repositories, commits, changed files, and individual changed blocks.
+- Clicking the sidebar, commit table, or changed-file list gives it keyboard focus, with native selection highlighting and arrow navigation.
+- Kept system appearance, source lists, toolbar controls, and standard AppKit splitters; pane geometry stays stable when the selection changes.
 - Adopted the system window background and separate native toolbar groups on macOS 26 and later, including Golden Gate, while retaining macOS 15 support.
 - Removed the sidebar toggle from the toolbar.
 - Balanced the default table columns for the initial window size, retaining user-resized widths.

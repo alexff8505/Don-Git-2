@@ -3,11 +3,13 @@ import SwiftUI
 
 /// Keep SwiftUI's native table and use AppKit's column resize notifications.
 struct CommitTableColumnPersistence: NSViewRepresentable {
+    var selectedRowIndex: Int? = nil
     func makeNSView(context: Context) -> ColumnPersistenceView {
         ColumnPersistenceView()
     }
 
     func updateNSView(_ nsView: ColumnPersistenceView, context: Context) {
+        nsView.requestSelectionReveal(selectedRowIndex)
         nsView.connectWhenReady()
     }
 }
@@ -29,6 +31,22 @@ final class ColumnPersistenceView: NSView {
 
     private weak var table: NSTableView?
     private var connectionScheduled = false
+    private var requestedRow: Int?
+
+    func requestSelectionReveal(_ row: Int?) {
+        guard requestedRow != row else { return }
+        requestedRow = row
+        // SwiftUI applies its table selection during the same update; reveal it afterwards.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.requestedRow == row else { return }
+            self.revealRequestedSelection()
+        }
+    }
+
+    private func revealRequestedSelection() {
+        guard let table, let requestedRow, requestedRow >= 0, requestedRow < table.numberOfRows else { return }
+        table.scrollRowToVisible(requestedRow)
+    }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -79,7 +97,7 @@ final class ColumnPersistenceView: NSView {
             self, selector: #selector(columnsDidResize(_:)),
             name: NSTableView.columnDidResizeNotification, object: table
         )
-
+        revealRequestedSelection()
     }
 
     @objc private func columnsDidResize(_ notification: Notification) {
