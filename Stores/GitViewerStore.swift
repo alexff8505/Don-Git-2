@@ -6,7 +6,9 @@ final class GitViewerStore: ObservableObject {
     @Published var repositories: [GitRepository] = []
     @Published var selectedRepositoryID: GitRepository.ID?
     @Published var rows: [CommitRow] = []
-    @Published var selectedCommitID: CommitRow.ID?
+    @Published var selectedCommitID: CommitRow.ID? {
+        didSet { rememberSelectedCommit() }
+    }
     @Published var currentBranch: String?
     @Published var localChangesCount = 0
     @Published var isCommitting = false
@@ -25,7 +27,10 @@ final class GitViewerStore: ObservableObject {
     private let defaults: UserDefaults
     private let repositoryPathsKey = "repositoryPaths"
     private let selectedRepositoryPathKey = "selectedRepositoryPath"
+    private let selectedCommitsKey = "selectedCommitsByRepository"
     private let repositoryFolderColorsKey = "repositoryFolderColors"
+    private var selectedCommits: [GitRepository.ID: CommitRow.ID] = [:]
+    private var loadedHistoryRepositoryID: GitRepository.ID?
     private var historyCache: [GitRepository.ID: HistoryCacheEntry] = [:]
     private var hasLoadedInitialData = false
     private var autoRefreshTask: Task<Void, Never>?
@@ -35,6 +40,7 @@ final class GitViewerStore: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         selectedRepositoryID = defaults.string(forKey: selectedRepositoryPathKey)
+        selectedCommits = defaults.dictionary(forKey: selectedCommitsKey) as? [String: String] ?? [:]
         let savedColors = defaults.dictionary(forKey: repositoryFolderColorsKey) as? [String: String] ?? [:]
         repositoryFolderColors = savedColors.reduce(into: [:]) { result, entry in
             guard let color = RepositoryFolderColor(rawValue: entry.value), color != .defaultColor else { return }
@@ -74,9 +80,11 @@ final class GitViewerStore: ObservableObject {
 
     func selectRepository(_ id: GitRepository.ID?) async {
         guard selectedRepositoryID != id else { return }
+        clearHistorySelection()
         selectedRepositoryID = id
         persistSelectedRepository()
-        selectedCommitID = nil
+        currentBranch = nil
+        localChangesCount = 0
         await reloadSelectedHistory()
     }
 
@@ -110,13 +118,15 @@ final class GitViewerStore: ObservableObject {
         defaults.set(paths, forKey: repositoryPathsKey)
         repositories.removeAll { $0.id == id }
         historyCache[id] = nil
+        selectedCommits[id] = nil
+        defaults.set(selectedCommits, forKey: selectedCommitsKey)
         repositoryFolderColors[id] = nil
         persistRepositoryFolderColors()
 
         guard selectedRepositoryID == id else { return }
+        clearHistorySelection()
         selectedRepositoryID = repositories.first?.id
         persistSelectedRepository()
-        selectedCommitID = nil
         await reloadSelectedHistory()
     }
 
@@ -176,8 +186,7 @@ final class GitViewerStore: ObservableObject {
         if let selectedRepositoryID, !found.contains(where: { $0.id == selectedRepositoryID }) {
             self.selectedRepositoryID = nil
             persistSelectedRepository()
-            rows = []
-            selectedCommitID = nil
+            clearHistorySelection()
             currentBranch = nil
             localChangesCount = 0
         }
@@ -191,8 +200,7 @@ final class GitViewerStore: ObservableObject {
     private func reloadSelectedHistory(showsLoading: Bool = true) async {
         guard let selectedRepository else {
             historyLoadGeneration += 1
-            rows = []
-            selectedCommitID = nil
+            clearHistorySelection()
             currentBranch = nil
             localChangesCount = 0
             isLoadingHistory = false
@@ -221,7 +229,7 @@ final class GitViewerStore: ObservableObject {
             localChangesCount = localChanges
 
             if let cached = historyCache[selectedRepository.id], cached.signature == signature {
-                rows = cached.rows
+                applyHistory(cached.rows, repositoryID: repositoryID)
                 currentBranch = branch ?? cached.branch
                 isLoadingHistory = false
                 return
@@ -231,14 +239,13 @@ final class GitViewerStore: ObservableObject {
             guard isCurrentHistoryLoad(loadGeneration, repositoryID: repositoryID) else { return }
 
             historyCache[selectedRepository.id] = HistoryCacheEntry(signature: signature, branch: branch, rows: loadedRows)
-            rows = loadedRows
+            applyHistory(loadedRows, repositoryID: repositoryID)
             currentBranch = branch
             isLoadingHistory = false
         } catch {
             guard isCurrentHistoryLoad(loadGeneration, repositoryID: repositoryID) else { return }
 
-            rows = []
-            selectedCommitID = nil
+            clearHistorySelection()
             currentBranch = nil
             localChangesCount = 0
             isLoadingHistory = false
@@ -260,6 +267,32 @@ final class GitViewerStore: ObservableObject {
 
     private var configuredRepositoryPaths: [String] {
         defaults.stringArray(forKey: repositoryPathsKey) ?? []
+    }
+
+    private func rememberSelectedCommit() {
+        // A table can still send selection updates while its repository is changing.
+        guard let repositoryID = selectedRepositoryID,
+              loadedHistoryRepositoryID == repositoryID,
+              let selectedCommitID,
+              rows.contains(where: { $0.id == selectedCommitID }),
+              selectedCommits[repositoryID] != selectedCommitID else { return }
+
+        selectedCommits[repositoryID] = selectedCommitID
+        defaults.set(selectedCommits, forKey: selectedCommitsKey)
+    }
+
+    private func clearHistorySelection() {
+        loadedHistoryRepositoryID = nil
+        selectedCommitID = nil
+        rows = []
+    }
+
+    private func applyHistory(_ loadedRows: [CommitRow], repositoryID: GitRepository.ID) {
+        let commitID = selectedCommits[repositoryID]
+        loadedHistoryRepositoryID = nil
+        rows = loadedRows
+        loadedHistoryRepositoryID = repositoryID
+        selectedCommitID = loadedRows.first(where: { $0.id == commitID })?.id
     }
 
     private func persistSelectedRepository() {

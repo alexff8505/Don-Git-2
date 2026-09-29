@@ -2,6 +2,7 @@
 
 ## Unreleased — macOS visual polish
 
+- Remembered the last selected commit separately for each repository when switching repositories and reopening the app.
 - Added a resizable commit-details pane with changed-file selection, full commit messages, and addition/deletion counts.
 - Added native selectable unified and aligned side-by-side code diffs, synchronised vertical scrolling, and clear binary/metadata-only states.
 - Organised the code pane with a compact file toolbar, native path breadcrumbs, change navigation, readable line ranges, and fixed line-number gutters that stay out of copied text.

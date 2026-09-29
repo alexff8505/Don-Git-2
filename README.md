@@ -8,6 +8,7 @@ Don Git 2 is a native macOS Git history viewer for local repositories. It uses S
 
 - Add individual Git repositories with the sidebar `+` button or **File → Add Repository…** (`⌘O`).
 - Keep added repositories and the last selection between app launches.
+- Return to the last selected commit in each repository when switching repositories or reopening the app.
 - Assign a persistent colour to each repository folder from its right-click menu.
 - Sort repositories by name or most recent commit date.
 - View all branches and refs in a topological commit graph.
@@ -55,7 +56,7 @@ The packaged app is written to `dist/Don Git 2.app`.
 
 To package without launching, use `./script/build_and_run.sh --build`.
 
-Run the focused checks with `bash script/test_changes.sh`, `bash script/test_diff_view.sh`, `bash script/test_graph.sh`, and `bash script/test_columns.sh`.
+Run the focused checks with `bash script/test_changes.sh`, `bash script/test_diff_view.sh`, `bash script/test_graph.sh`, `bash script/test_columns.sh`, and `bash script/test_repository_selection.sh`.
 
 ## Release notes
 
