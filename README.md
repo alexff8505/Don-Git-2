@@ -1,30 +1,34 @@
 # Don Git 2
 
-Don Git 2 is a native macOS Git history viewer for local repositories. It uses SwiftUI and standard macOS controls to keep repository navigation, commit history, branches, refs, and local changes visible in one window.
+**Native commit review, built for macOS.**
 
-![Don Git 2 showing colour-coded repositories and commit history](Docs/Screenshots/repository-history.png)
+Explore your local Git repositories, follow the commit graph, and see exactly what changed in each commit. Don Git 2 uses SwiftUI, AppKit, and standard macOS controls, with keyboard navigation and a workspace that remembers where you left off.
 
-## Features
+![Don Git 2 reviewing a commit in unified mode, with a native blue selection, changed files, path breadcrumbs, and code diffs](Docs/Screenshots/commit-diff-unified.jpg)
 
-- Add individual Git repositories with the sidebar `+` button or **File → Add Repository…** (`⌘O`).
-- Keep added repositories and the last selection between app launches.
-- Return to the last selected commit in each repository when switching repositories or reopening the app.
-- Assign a persistent colour to each repository folder from its right-click menu.
-- Sort repositories by name or most recent commit date.
-- View all branches and refs in a topological commit graph.
-- Select a commit to inspect its changed files, full message, and addition/deletion counts.
-- Read selectable code diffs in unified or aligned side-by-side mode, with synchronised vertical scrolling.
-- Follow the native file path bar, use previous/next change buttons, and read fixed line-number gutters with plain line-range section headings.
-- Toggle **Wrap Lines** to fit long code to the pane; the choice is remembered, and side-by-side rows stay aligned.
-- Keep resized history columns, changed-file width, and history/code divider positions between launches.
-- Compare merge commits against either parent; view root commits against an empty tree.
-- See the current branch, commit count, and working-tree status in the bottom status bar.
-- Refresh history with the native toolbar action or **File → Refresh History** (`⌘R`).
-- Stage and commit all local changes with a multiline commit message (`⌘Return` in the commit sheet).
+## New in the latest update
 
-The repository picker uses the standard macOS open panel and accepts any folder inside a Git working tree.
+| Feature | What it does |
+| --- | --- |
+| **Changes per commit** | Select a commit to see its changed files, full message, and addition/deletion counts. |
+| **Two diff views** | Review one unified diff or compare before and after side by side, with synchronised vertical scrolling. |
+| **Keyboard navigation** | Move between repositories, commits, files, and changed blocks using native focus and shortcuts. |
+| **Wrap Lines** | Fit long code to the pane while keeping side-by-side rows aligned. Your choice is remembered. |
+| **Remembered workspace** | Restore column widths, pane sizes, and the last selected commit in each repository, including after restarting. |
 
-Use the **Navigate** menu to move through history and changes from the keyboard:
+See the [changelog](RELEASE_NOTES.md) for the full update.
+
+## Read the changes, in context
+
+A compact file toolbar keeps **Wrap Lines**, change counts, and previous/next controls close to the code. Native path breadcrumbs show where the file belongs; fixed line-number gutters and plain line ranges help you follow the diff. Select and copy code using the standard macOS text controls.
+
+![Before and after code with aligned wrapped lines, a focused changed-file selection, and Change 1 of 15](Docs/Screenshots/commit-diff-side-by-side.jpg)
+
+Compare merge commits against either parent, and root commits against an empty tree. Renames, deletions, additions, binary files, and metadata-only changes have explicit representations.
+
+## Stay in the flow
+
+Click the sidebar, commit history, or changed-file list to focus it. The selected row uses the native blue accent highlight on the pictured system, and arrow keys move through that list. The **Navigate** menu provides shortcuts for moving between panes and changes.
 
 | Action | Shortcut |
 | --- | --- |
@@ -32,32 +36,47 @@ Use the **Navigate** menu to move through history and changes from the keyboard:
 | Previous / next commit | ⌃⌘↑ / ⌃⌘↓ |
 | Previous / next changed file | ⌥⌘↑ / ⌥⌘↓ |
 | Previous / next changed block | ⌥⌘← / ⌥⌘→ |
+| Add repository | ⌘O |
+| Refresh history | ⌘R |
+| Submit the commit sheet | ⌘Return |
 
-Click the repository sidebar, commit table, or changed-file list to focus it: the selected row uses the native accent highlight and arrow keys move through its rows. Code supports native text selection and copying. File names, renames, binary files, and file metadata changes are shown explicitly.
+![Focused repository sidebar and the second changed block selected in the code view](Docs/Screenshots/keyboard-navigation.jpg)
 
-## Requirements
+Switch repositories and return to the commit you were reviewing. Resized history columns and pane dividers also survive app restarts.
 
-- macOS 15 or later
-- Swift 6.1 or later
+## A familiar macOS workspace
+
+- Add repositories through the standard macOS folder picker; any folder inside a Git working tree is accepted.
+- Give repository folders persistent colours and sort by name or most recent commit date.
+- Follow all branches and refs in a topological commit graph, with branch, remote, and tag badges.
+- Read the current branch, commit count, and working-tree status in the bottom bar.
+- Refresh history from the native toolbar or File menu.
+- Stage and commit all local changes from a multiline commit sheet.
+
+The interface follows system appearance and native macOS conventions, including the macOS 26 / Golden Gate toolbar treatment, while retaining macOS 15 support.
 
 ## Build and run
 
-```bash
-./script/build_and_run.sh
-```
-
-To compile without creating and launching the app bundle:
+Requires **macOS 15 or later**, **Swift 6.1 or later**, and Git available at `/usr/bin/git`.
 
 ```bash
-swift build
+git clone https://github.com/alexff8505/Don-Git-2.git
+cd Don-Git-2
+bash script/build_and_run.sh
 ```
 
-The packaged app is written to `dist/Don Git 2.app`.
+The packaged app is written to `dist/Don Git 2.app`. Use `bash script/build_and_run.sh --build` to package without launching, or `swift build` to compile only.
 
-To package without launching, use `./script/build_and_run.sh --build`.
+## Checks
 
-Run the focused checks with `bash script/test_changes.sh`, `bash script/test_diff_view.sh`, `bash script/test_graph.sh`, `bash script/test_columns.sh`, and `bash script/test_repository_selection.sh`.
+The focused checks cover Git history and diffs, native rendering, column persistence, and repository selection memory:
 
-## Release notes
+```bash
+bash script/test_graph.sh
+bash script/test_changes.sh
+bash script/test_diff_view.sh
+bash script/test_columns.sh
+bash script/test_repository_selection.sh
+```
 
-See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the latest changes.
+[Changelog](RELEASE_NOTES.md) · [Screenshot gallery](Docs/Screenshots/README.md)
