@@ -20,7 +20,8 @@ let package = Package(
                 "AGENTS.md",
                 "Assets",
                 "dist",
-                "script"
+                "script",
+                "Tests"
             ],
             sources: [
                 "App",

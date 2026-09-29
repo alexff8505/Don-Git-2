@@ -35,8 +35,7 @@ struct RepositoryHistoryView: View {
             } else {
                 CommitTable(
                     rows: store.rows,
-                    selectedCommitID: $store.selectedCommitID,
-                    graphColumnWidth: store.graphColumnWidth
+                    selectedCommitID: $store.selectedCommitID
                 )
             }
         }

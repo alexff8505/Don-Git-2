@@ -1,132 +1,83 @@
 import Foundation
 
+/// Preserve Git's lane placement and colour decisions instead of recreating them.
 struct CommitGraphBuilder {
-    func rows(for commits: [GitCommit]) -> [CommitRow] {
-        let commitIndexes = Dictionary(uniqueKeysWithValues: commits.enumerated().map { index, commit in
-            (commit.hash, index)
-        })
-        var lanes: [GraphLane] = []
-        var rows: [CommitRow] = []
+    func rows(for commits: [GitCommit], graphOutput: String) throws -> [CommitRow] {
+        var blocks: [[[GitGraphGlyph]]] = []
+        var pending: [[GitGraphGlyph]] = []
+        var hashes: [String] = []
 
-        for commit in commits {
-            var nodeLane = lanes.firstIndex { $0.hash == commit.hash }
-            let hasIncomingLane = nodeLane != nil
-            if nodeLane == nil {
-                lanes.append(GraphLane(hash: commit.hash, colorIndex: nextColorIndex(for: lanes)))
-                nodeLane = lanes.count - 1
-            }
-
-            guard let currentLane = nodeLane else { continue }
-            let lanesBefore = lanes
-            let nodeColorIndex = lanesBefore[currentLane].colorIndex
-
-            lanes.remove(at: currentLane)
-
-            let graphParents = orderedParents(for: commit, commitIndexes: commitIndexes)
-            let parents = placeParents(
-                graphParents,
-                in: &lanes,
-                startingAt: currentLane,
-                continuingColorIndex: nodeColorIndex
-            )
-            let laneMoves = laneMoves(from: lanesBefore, to: lanes, excluding: currentLane)
-
-            let graph = CommitGraphState(
-                lanesBefore: lanesBefore.map(\.hash),
-                lanesAfter: lanes.map(\.hash),
-                laneColorIndexesBefore: lanesBefore.map(\.colorIndex),
-                laneColorIndexesAfter: lanes.map(\.colorIndex),
-                laneMoves: laneMoves,
-                nodeLane: currentLane,
-                nodeColorIndex: nodeColorIndex,
-                parentLanes: parents.map(\.lane),
-                parentConnectorColorIndexes: parents.map(\.connectorColorIndex),
-                laneCount: max(lanesBefore.count, lanes.count, currentLane + 1),
-                isMerge: commit.parents.count > 1,
-                hasIncomingLane: hasIncomingLane
-            )
-
-            rows.append(CommitRow(commit: commit, graph: graph))
-        }
-
-        return rows
-    }
-
-    private func orderedParents(for commit: GitCommit, commitIndexes: [String: Int]) -> [String] {
-        guard let firstParent = commit.parents.first,
-              commit.parents.count > 2 else {
-            return commit.parents
-        }
-
-        let additionalParents = commit.parents.dropFirst().sorted { lhs, rhs in
-            (commitIndexes[lhs] ?? Int.max) < (commitIndexes[rhs] ?? Int.max)
-        }
-
-        return [firstParent] + additionalParents
-    }
-
-    private func placeParents(
-        _ parents: [String],
-        in lanes: inout [GraphLane],
-        startingAt currentLane: Int,
-        continuingColorIndex: Int
-    ) -> [GraphParentLane] {
-        var parentLanes: [GraphParentLane] = []
-        var seenParents = Set<String>()
-
-        for parent in parents where seenParents.insert(parent).inserted {
-            let isFirstParent = parentLanes.isEmpty
-
-            if let existingLane = lanes.firstIndex(where: { $0.hash == parent }) {
-                parentLanes.append(GraphParentLane(lane: existingLane, connectorColorIndex: lanes[existingLane].colorIndex))
-                continue
-            }
-
-            if isFirstParent {
-                let insertionLane = min(currentLane, lanes.count)
-                lanes.insert(GraphLane(hash: parent, colorIndex: continuingColorIndex), at: insertionLane)
-                parentLanes.append(GraphParentLane(lane: insertionLane, connectorColorIndex: continuingColorIndex))
+        for line in graphOutput.split(separator: "\n", omittingEmptySubsequences: false) {
+            if let marker = line.firstIndex(of: "\u{1f}") {
+                let prefix = String(line[..<marker])
+                let hash = String(line[line.index(after: marker)...])
+                guard hashes.count < commits.count, commits[hashes.count].hash == hash else {
+                    throw GitClient.GitClientError.invalidOutput
+                }
+                hashes.append(hash)
+                blocks.append(pending + [glyphs(in: prefix)])
+                pending.removeAll(keepingCapacity: true)
             } else {
-                let insertionLane = min(currentLane + parentLanes.count, lanes.count)
-                let colorIndex = nextColorIndex(for: lanes, avoiding: [continuingColorIndex])
-                lanes.insert(GraphLane(hash: parent, colorIndex: colorIndex), at: insertionLane)
-                parentLanes.append(GraphParentLane(lane: insertionLane, connectorColorIndex: colorIndex))
+                let glyphs = glyphs(in: String(line))
+                guard glyphs.contains(where: { $0.character != " " }) else { continue }
+                // Git's routing rows follow the commit they connect to its parents.
+                if blocks.isEmpty {
+                    pending.append(glyphs)
+                } else {
+                    blocks[blocks.count - 1].append(glyphs)
+                }
             }
         }
 
-        return parentLanes
+        guard hashes.count == commits.count else { throw GitClient.GitClientError.invalidOutput }
+        return commits.enumerated().map { index, commit in
+            let lines = blocks[index]
+            let nodeColumn = lines[0].firstIndex { $0.character == "*" } ?? 0
+            let incoming: [Int]? = index > 0
+                ? edgeColor(in: blocks[index - 1].last ?? [], column: nodeColumn, atBottom: true, allowStar: !commits[index - 1].parents.isEmpty) : nil
+            let nextLine = lines.count > 1 ? lines[1] : (index + 1 < blocks.count ? blocks[index + 1][0] : [])
+            let outgoing = commit.parents.isEmpty ? nil : edgeColor(in: nextLine, column: nodeColumn, atBottom: false)
+            return CommitRow(commit: commit, graph: CommitGraphState(
+                lines: lines, hasParents: !commit.parents.isEmpty,
+                incomingColor: incoming, outgoingColor: outgoing
+            ))
+        }
     }
 
-    private func laneMoves(from lanesBefore: [GraphLane], to lanesAfter: [GraphLane], excluding nodeLane: Int) -> [CommitGraphLaneMove] {
-        lanesBefore.enumerated().compactMap { oldIndex, hash in
-            guard oldIndex != nodeLane,
-                  let newIndex = lanesAfter.firstIndex(where: { $0.hash == hash.hash }),
-                  oldIndex != newIndex else {
-                return nil
+    private func edgeColor(in line: [GitGraphGlyph], column: Int, atBottom: Bool, allowStar: Bool = true) -> [Int]? {
+        for (index, glyph) in line.enumerated() {
+            let endpoint: Int
+            switch glyph.character {
+            case "|": endpoint = index
+            case "*" where allowStar: endpoint = index
+            case "/": endpoint = index + (atBottom ? -1 : 1)
+            case "\\": endpoint = index + (atBottom ? 1 : -1)
+            default: continue
             }
-
-            return CommitGraphLaneMove(fromLane: oldIndex, toLane: newIndex, colorIndex: hash.colorIndex)
+            if endpoint == column { return glyph.color }
         }
+        return nil
     }
 
-    private func nextColorIndex(for lanes: [GraphLane], avoiding reservedColorIndexes: Set<Int> = []) -> Int {
-        let usedColorIndexes = Set(lanes.map(\.colorIndex)).union(reservedColorIndexes)
-        var colorIndex = 0
-
-        while usedColorIndexes.contains(colorIndex) {
-            colorIndex += 1
+    private func glyphs(in text: String) -> [GitGraphGlyph] {
+        var result: [GitGraphGlyph] = []
+        var color: [Int] = []
+        var index = text.startIndex
+        while index < text.endIndex {
+            if text[index] == "\u{1b}" {
+                let next = text.index(after: index)
+                if next < text.endIndex, text[next] == "[",
+                   let end = text[next...].firstIndex(of: "m") {
+                    let codes = text[text.index(after: next)..<end].split(separator: ";").compactMap { Int($0) }
+                    if codes.isEmpty || codes.contains(0) { color = [] }
+                    color.append(contentsOf: codes.filter { $0 != 0 })
+                    index = text.index(after: end)
+                    continue
+                }
+            }
+            result.append(GitGraphGlyph(character: text[index], color: color))
+            index = text.index(after: index)
         }
-
-        return colorIndex
+        return result
     }
-}
-
-private struct GraphLane {
-    let hash: String
-    let colorIndex: Int
-}
-
-private struct GraphParentLane {
-    let lane: Int
-    let connectorColorIndex: Int
 }

@@ -81,7 +81,12 @@ struct GitClient: Sendable {
 
         let output = try runGit(arguments, in: repository.path)
         let commits = try parseCommits(output)
-        return CommitGraphBuilder().rows(for: commits)
+        // --graph implies topological ordering; use the same ordering for metadata.
+        let graphOutput = try runGit([
+            "log", "--graph", "--all", "--topo-order", "--color=always",
+            "--format=%x1f%H"
+        ], in: repository.path)
+        return try CommitGraphBuilder().rows(for: commits, graphOutput: graphOutput)
     }
 
     private func runGit(_ arguments: [String], in directory: URL) throws -> String {

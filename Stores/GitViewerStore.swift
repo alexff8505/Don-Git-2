@@ -47,11 +47,6 @@ final class GitViewerStore: ObservableObject {
         return repositories.first { $0.id == selectedRepositoryID }
     }
 
-    var graphColumnWidth: CGFloat {
-        let maxLaneCount = rows.map(\.graph.laneCount).max() ?? 1
-        return CGFloat(min(max(maxLaneCount, 1), 10)) * 14 + 22
-    }
-
     func loadInitialData() async {
         guard !hasLoadedInitialData else { return }
         hasLoadedInitialData = true

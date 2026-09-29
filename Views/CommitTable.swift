@@ -3,35 +3,28 @@ import SwiftUI
 struct CommitTable: View {
     let rows: [CommitRow]
     @Binding var selectedCommitID: CommitRow.ID?
-    let graphColumnWidth: CGFloat
 
     var body: some View {
         Table(rows, selection: $selectedCommitID) {
             TableColumn("Graph") { row in
-                CommitGraphView(graph: row.graph, isFirstRow: row.id == rows.first?.id)
-                    .frame(height: CommitTableMetrics.rowHeight + CommitTableMetrics.graphVerticalBleed * 2)
+                CommitGraphView(graph: row.graph)
+                    .frame(height: rowHeight(for: row) + CommitTableMetrics.graphVerticalBleed * 2)
                     .offset(y: -CommitTableMetrics.graphVerticalBleed)
-                    .frame(height: CommitTableMetrics.rowHeight, alignment: .top)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 2)
+                    .frame(height: rowHeight(for: row), alignment: .top)
             }
-            .width(
-                min: CommitTableMetrics.minimumGraphWidth,
-                ideal: fittedGraphWidth,
-                max: CommitTableMetrics.maximumGraphWidth
-            )
+            .width(min: 42, ideal: 140, max: 2_000)
 
             TableColumn("Commit") { row in
                 CommitSummaryCell(row: row)
             }
-            .width(min: 260, ideal: 680, max: 1_600)
+            .width(min: 160, ideal: 680, max: 3_000)
 
             TableColumn("Hash") { row in
                 Text(row.commit.shortHash)
                     .font(.system(.body, design: .monospaced))
                     .lineLimit(1)
             }
-            .width(min: 78, ideal: 96, max: 160)
+            .width(min: 60, ideal: 96, max: 400)
 
             TableColumn("Author") { row in
                 HStack(spacing: 6) {
@@ -43,26 +36,26 @@ struct CommitTable: View {
                 }
                 .font(.callout)
             }
-            .width(min: 120, ideal: 170, max: 280)
+            .width(min: 80, ideal: 170, max: 1_000)
 
             TableColumn("Date") { row in
                 Text(DisplayFormatters.commitDate(row.commit.authoredAt))
                     .lineLimit(1)
             }
-            .width(min: 140, ideal: 178, max: 260)
+            .width(min: 100, ideal: 178, max: 1_000)
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
+        .background(CommitTableColumnPersistence())
     }
 
-    private var fittedGraphWidth: CGFloat {
-        max(CommitTableMetrics.minimumGraphWidth, min(graphColumnWidth, CommitTableMetrics.maximumGraphWidth))
+    private func rowHeight(for row: CommitRow) -> CGFloat {
+        max(CommitTableMetrics.rowHeight, CGFloat(row.graph.lines.count) * 18)
     }
+
 }
 
 private enum CommitTableMetrics {
     static let rowHeight: CGFloat = 42
-    static let minimumGraphWidth: CGFloat = 58
-    static let maximumGraphWidth: CGFloat = 220
     static let graphVerticalBleed: CGFloat = 7
 }
 
@@ -75,18 +68,16 @@ private struct CommitSummaryCell: View {
                 Text(row.commit.subject)
                     .lineLimit(1)
                     .foregroundStyle(row.commit.subject.isEmpty ? .secondary : .primary)
-
                 HStack(spacing: 5) {
-                    ForEach(row.commit.refs) { badge in
+                    ForEach(row.commit.refs.filter { $0.kind != .head || !row.commit.refs.contains(where: { $0.kind == .currentBranch }) }) { badge in
                         RefBadgeView(badge: badge)
                     }
                 }
-                .frame(width: proxy.size.width, alignment: .leading)
-                .clipped()
             }
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .leading)
             .clipped()
         }
+        .help(([row.commit.subject] + row.commit.refs.map(\.name)).joined(separator: "\n"))
     }
 }
 
@@ -95,7 +86,11 @@ private struct RefBadgeView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            Text(badge.name)
+            if badge.kind == .currentBranch {
+                Text("HEAD").foregroundStyle(.cyan)
+                Text(" → ").foregroundStyle(.secondary)
+            }
+            Text(badge.kind == .tag ? "tag: \(badge.name)" : badge.name)
                 .lineLimit(1)
         }
         .font(.caption2.weight(.semibold))
@@ -113,55 +108,15 @@ private struct RefBadgeView: View {
     }
 
     private var style: RefBadgeStyle {
-        let name = badge.name.lowercased()
-
         switch badge.kind {
         case .head:
-            return RefBadgeStyle(
-                foreground: .orange,
-                tint: .orange
-            )
+            return RefBadgeStyle(foreground: .cyan, tint: .cyan)
+        case .currentBranch, .branch:
+            return RefBadgeStyle(foreground: .green, tint: .green)
         case .remote:
-            if name == "origin/head" {
-                return RefBadgeStyle(
-                    foreground: .orange,
-                    tint: .orange
-                )
-            }
-
-            return RefBadgeStyle(
-                foreground: .purple,
-                tint: .purple
-            )
-        case .currentBranch:
-            return RefBadgeStyle(
-                foreground: .green,
-                tint: .green
-            )
-        case .branch:
-            if name == "dev" {
-                return RefBadgeStyle(
-                    foreground: .green,
-                    tint: .green
-                )
-            }
-
-            if name == "main" {
-                return RefBadgeStyle(
-                    foreground: .green,
-                    tint: .green
-                )
-            }
-
-            return RefBadgeStyle(
-                foreground: .green,
-                tint: .green
-            )
+            return RefBadgeStyle(foreground: .red, tint: .red)
         case .tag:
-            return RefBadgeStyle(
-                foreground: .purple,
-                tint: .purple
-            )
+            return RefBadgeStyle(foreground: .yellow, tint: .yellow)
         }
     }
 }
@@ -172,26 +127,5 @@ private struct RefBadgeStyle {
 
     var border: Color {
         tint.opacity(0.42)
-    }
-}
-
-private extension CommitGraphState {
-    func color(forCommitHash hash: String) -> Color {
-        if let lane = lanesBefore.firstIndex(of: hash) {
-            let colorIndex = laneColorIndexesBefore.indices.contains(lane) ? laneColorIndexesBefore[lane] : lane
-            return GitGraphColorPalette.color(for: colorIndex)
-        }
-
-        return GitGraphColorPalette.color(for: nodeColorIndex)
-    }
-}
-
-private extension GitRefBadge {
-    var remoteLocalName: String {
-        guard kind == .remote, let slashIndex = name.firstIndex(of: "/") else {
-            return name
-        }
-
-        return String(name[name.index(after: slashIndex)...])
     }
 }

@@ -1,26 +1,32 @@
 import SwiftUI
 
+/// ANSI hues, using native adaptive colours for both macOS appearances.
 enum GitGraphColorPalette {
-    private static let colors: [Color] = [
-        Color(red: 0.00, green: 0.62, blue: 0.76),
-        Color(red: 0.98, green: 0.55, blue: 0.16),
-        Color(red: 0.18, green: 0.78, blue: 0.37),
-        Color(red: 0.26, green: 0.48, blue: 0.95),
-        Color(red: 0.86, green: 0.08, blue: 0.55),
-        Color(red: 0.02, green: 0.83, blue: 0.76),
-        Color(red: 0.62, green: 0.31, blue: 0.96),
-        Color(red: 0.95, green: 0.84, blue: 0.18),
-        Color(red: 0.95, green: 0.26, blue: 0.22),
-        Color(red: 0.00, green: 0.74, blue: 0.95),
-        Color(red: 0.42, green: 0.86, blue: 0.23),
-        Color(red: 0.86, green: 0.25, blue: 0.82),
-        Color(red: 1.00, green: 0.42, blue: 0.14),
-        Color(red: 0.00, green: 0.56, blue: 0.82),
-        Color(red: 0.00, green: 0.72, blue: 0.48),
-        Color(red: 0.70, green: 0.25, blue: 0.92)
-    ]
+    private static let colors: [Color] = [.primary, .red, .green, .yellow, .blue, .purple, .cyan, .primary]
 
-    static func color(for lane: Int) -> Color {
-        colors[abs(lane) % colors.count]
+    static func color(for codes: [Int]) -> Color {
+        if let extended = codes.lastIndex(of: 38), codes.count > extended + 2 {
+            if codes[extended + 1] == 2, codes.count > extended + 4 {
+                return Color(red: Double(codes[extended + 2]) / 255,
+                             green: Double(codes[extended + 3]) / 255,
+                             blue: Double(codes[extended + 4]) / 255)
+            }
+            if codes[extended + 1] == 5 {
+                let value = codes[extended + 2]
+                if value < 16 { return colors[max(0, value) % 8] }
+                if value >= 232 {
+                    return Color(white: Double(min(255, 8 + (value - 232) * 10)) / 255)
+                }
+                let cube = value - 16
+                let levels = [0.0, 95.0, 135.0, 175.0, 215.0, 255.0]
+                return Color(red: levels[(cube / 36) % 6] / 255,
+                             green: levels[(cube / 6) % 6] / 255,
+                             blue: levels[cube % 6] / 255)
+            }
+        }
+        guard let code = codes.last(where: { (30...37).contains($0) || (90...97).contains($0) }) else {
+            return .primary
+        }
+        return colors[code >= 90 ? code - 90 : code - 30]
     }
 }

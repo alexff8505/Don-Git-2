@@ -44,23 +44,23 @@ struct CommitRow: Identifiable, Hashable, Sendable {
     }
 }
 
+// Each line is emitted by Git's graph renderer, including merge and collapse rows.
 struct CommitGraphState: Hashable, Sendable {
-    let lanesBefore: [String]
-    let lanesAfter: [String]
-    let laneColorIndexesBefore: [Int]
-    let laneColorIndexesAfter: [Int]
-    let laneMoves: [CommitGraphLaneMove]
-    let nodeLane: Int
-    let nodeColorIndex: Int
-    let parentLanes: [Int]
-    let parentConnectorColorIndexes: [Int]
-    let laneCount: Int
-    let isMerge: Bool
-    let hasIncomingLane: Bool
+    let lines: [[GitGraphGlyph]]
+    let hasParents: Bool
+    let incomingColor: [Int]?
+    let outgoingColor: [Int]?
+
+    var laneCount: Int {
+        ((lines.map(\.count).max() ?? 1) + 1) / 2
+    }
+
+    var nodeLine: Int {
+        lines.firstIndex { $0.contains { $0.character == "*" } } ?? 0
+    }
 }
 
-struct CommitGraphLaneMove: Hashable, Sendable {
-    let fromLane: Int
-    let toLane: Int
-    let colorIndex: Int
+struct GitGraphGlyph: Hashable, Sendable {
+    let character: Character
+    let color: [Int]
 }
