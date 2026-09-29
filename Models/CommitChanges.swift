@@ -43,6 +43,22 @@ struct DiffLine: Identifiable, Hashable, Sendable {
     let text: String
     let oldNumber: Int?
     let newNumber: Int?
+
+    /// Keep Git's raw hunk text in the model, with readable ranges for the display.
+    func sectionTitle(oldSide: Bool? = nil) -> String {
+        guard kind == .hunk,
+              let match = text.firstMatch(of: /@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/),
+              let oldStart = Int(match.1), let newStart = Int(match.3) else { return text }
+        func range(_ start: Int, _ count: Int) -> String {
+            if count == 0 { return "No lines" }
+            if count == 1 { return "Line \(start)" }
+            return "Lines \(start)–\(start + count - 1)"
+        }
+        let before = range(oldStart, match.2.flatMap { Int($0) } ?? 1)
+        let after = range(newStart, match.4.flatMap { Int($0) } ?? 1)
+        if let oldSide { return oldSide ? before : after }
+        return before == after ? before : "Before: \(before) · After: \(after)"
+    }
 }
 
 struct SplitDiffLine: Hashable, Sendable {

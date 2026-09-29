@@ -4,6 +4,10 @@
 
 - Added a resizable commit-details pane with changed-file selection, full commit messages, and addition/deletion counts.
 - Added native selectable unified and aligned side-by-side code diffs, synchronised vertical scrolling, and clear binary/metadata-only states.
+- Organised the code pane with a compact file toolbar, native path breadcrumbs, change navigation, readable line ranges, and fixed line-number gutters that stay out of copied text.
+- Used native folder/file icons in the path bar without stretching symbol proportions.
+- Added a remembered Wrap Lines option with aligned wrapped rows, line numbers, and change backgrounds in both diff modes.
+- Restored history column widths after the initial table layout, and remembered changed-file, history, and code-pane sizes.
 - Added parent selection for merge comparisons and empty-tree comparison for root commits.
 - Added a Navigate menu with keyboard shortcuts for repositories, commits, changed files, and individual changed blocks.
 - Clicking the sidebar, commit table, or changed-file list gives it keyboard focus, with native selection highlighting and arrow navigation.

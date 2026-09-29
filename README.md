@@ -13,6 +13,9 @@ Don Git 2 is a native macOS Git history viewer for local repositories. It uses S
 - View all branches and refs in a topological commit graph.
 - Select a commit to inspect its changed files, full message, and addition/deletion counts.
 - Read selectable code diffs in unified or aligned side-by-side mode, with synchronised vertical scrolling.
+- Follow the native file path bar, use previous/next change buttons, and read fixed line-number gutters with plain line-range section headings.
+- Toggle **Wrap Lines** to fit long code to the pane; the choice is remembered, and side-by-side rows stay aligned.
+- Keep resized history columns, changed-file width, and history/code divider positions between launches.
 - Compare merge commits against either parent; view root commits against an empty tree.
 - See the current branch, commit count, and working-tree status in the bottom status bar.
 - Refresh history with the native toolbar action or **File → Refresh History** (`⌘R`).

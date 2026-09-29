@@ -8,6 +8,7 @@ struct NativeSplitView<First: View, Second: View>: NSViewRepresentable {
     let minimumFirstSize: CGFloat
     let minimumSecondSize: CGFloat
     var maximumFirstSize: CGFloat = .greatestFiniteMagnitude
+    var persistenceKey: String? = nil
     @ViewBuilder let first: () -> First
     @ViewBuilder let second: () -> Second
 
@@ -19,6 +20,7 @@ struct NativeSplitView<First: View, Second: View>: NSViewRepresentable {
         view.minimumFirstSize = minimumFirstSize
         view.minimumSecondSize = minimumSecondSize
         view.maximumFirstSize = maximumFirstSize
+        view.persistenceKey = persistenceKey
         view.update(first: AnyView(first()), second: AnyView(second()))
         return view
     }
@@ -34,6 +36,9 @@ final class HostingSplitView: NSSplitView, NSSplitViewDelegate {
     var minimumFirstSize: CGFloat = 150
     var minimumSecondSize: CGFloat = 240
     var maximumFirstSize: CGFloat = .greatestFiniteMagnitude
+    var persistenceKey: String?
+    var defaults: UserDefaults = .standard
+    private var adjustingSize = false
     private var firstHost: NSHostingView<AnyView>?
     private var secondHost: NSHostingView<AnyView>?
     private var hasInitialSize = false
@@ -68,9 +73,13 @@ final class HostingSplitView: NSSplitView, NSSplitViewDelegate {
         super.layout()
         let extent = isVertical ? bounds.width : bounds.height
         guard extent > 0 else { return }
+        adjustingSize = true
+        defer { adjustingSize = false }
         if !hasInitialSize {
             hasInitialSize = true
-            let position = initialFirstSize <= 1 ? extent * initialFirstSize : initialFirstSize
+            let saved = persistenceKey.flatMap { defaults.object(forKey: $0) as? Double }
+            let size = saved.flatMap { $0.isFinite && $0 > 0 ? CGFloat($0) : nil } ?? initialFirstSize
+            let position = size <= 1 ? extent * size : size
             setPosition(clamped(position, extent: extent), ofDividerAt: 0)
         } else if lastExtent != extent, let firstHost {
             let position = isVertical ? firstHost.frame.width : firstHost.frame.height
@@ -94,4 +103,13 @@ final class HostingSplitView: NSSplitView, NSSplitViewDelegate {
     }
 
     func splitView(_ splitView: NSSplitView, canCollapseSubview subview: NSView) -> Bool { false }
+
+    func splitViewDidResizeSubviews(_ notification: Notification) {
+        let extent = isVertical ? bounds.width : bounds.height
+        guard hasInitialSize, !adjustingSize, extent == lastExtent, extent > 0,
+              let persistenceKey, let firstHost else { return }
+        let position = isVertical ? firstHost.frame.width : firstHost.frame.height
+        guard position >= minimumFirstSize else { return }
+        defaults.set(Double(isVertical ? position : position / extent), forKey: persistenceKey)
+    }
 }

@@ -8,6 +8,7 @@ struct CommitChangesView: View {
     @State private var showsMessage = false
     @FocusState private var filesHaveKeyboardFocus: Bool
     @AppStorage("commitDiffPresentation") private var presentation: DiffPresentation = .unified
+    @AppStorage("commitDiffWordWrap") private var wordWrap = false
 
     private var parent: String? { commit.parents.indices.contains(parentIndex) ? commit.parents[parentIndex] : nil }
     private var comparisonID: String { repository.id + ":" + commit.hash + ":" + (parent ?? "root") }
@@ -34,7 +35,7 @@ struct CommitChangesView: View {
                 ContentUnavailableView("No File Changes", systemImage: "doc", description:
                     Text(commit.parents.count > 1 ? "This merge has no file changes compared with the selected parent." : "This commit has no file changes."))
             } else {
-                NativeSplitView(isVertical: true, initialFirstSize: 270, minimumFirstSize: 180, minimumSecondSize: 300, maximumFirstSize: 460) {
+                NativeSplitView(isVertical: true, initialFirstSize: 270, minimumFirstSize: 180, minimumSecondSize: 300, maximumFirstSize: 460, persistenceKey: "changedFilesPaneWidth") {
                     fileList
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } second: {
@@ -187,19 +188,7 @@ struct CommitChangesView: View {
     private var diffPane: some View {
         VStack(spacing: 0) {
             if let file = details.selectedFile {
-                HStack(spacing: 8) {
-                    Image(systemName: "doc").foregroundStyle(.secondary)
-                    Text(file.path)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .textSelection(.enabled)
-                    Spacer()
-                    Text(file.statusTitle).foregroundStyle(.secondary)
-                }
-                .font(.callout)
-                .padding(.horizontal, 12)
-                .frame(height: 34)
-                .background(.bar)
+                fileToolbar(file)
                 Divider()
             }
             if details.isLoadingDiff {
@@ -218,11 +207,64 @@ struct CommitChangesView: View {
                 } else if diff.lines.isEmpty {
                     ContentUnavailableView("No Text Changes", systemImage: "doc", description: Text("Only the file name or metadata changed."))
                 } else {
-                    DiffCodeView(diff: diff, presentation: presentation, selectedChangeID: details.selectedChangeID)
+                    DiffCodeView(diff: diff, presentation: presentation, selectedChangeID: details.selectedChangeID, wordWrap: wordWrap)
                 }
             } else {
                 ContentUnavailableView("Select a File", systemImage: "doc.text.magnifyingglass", description: Text("Choose a changed file to view its diff."))
             }
         }
+    }
+
+    private func fileToolbar(_ file: CommitChangedFile) -> some View {
+        let changes = details.diff?.changeIDs ?? []
+        let selectedIndex = details.selectedChangeID.flatMap { changes.firstIndex(of: $0) }
+        return VStack(spacing: 3) {
+            HStack(spacing: 8) {
+                Image(systemName: "doc").foregroundStyle(.secondary)
+                Text((file.path as NSString).lastPathComponent)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(file.path + " — " + file.statusTitle)
+                    .textSelection(.enabled)
+                Spacer(minLength: 0)
+                Toggle("Wrap Lines", isOn: $wordWrap)
+                    .toggleStyle(.button)
+                    .help("Wrap long code lines to fit the pane")
+                    .disabled(file.isBinary)
+                if file.isBinary {
+                    Text("Binary").foregroundStyle(.secondary)
+                } else {
+                    Text("+\(file.additions ?? 0)").foregroundStyle(.green)
+                    Text("−\(file.deletions ?? 0)").foregroundStyle(.red)
+                }
+                ControlGroup {
+                    Button { details.moveChange(-1) } label: { Image(systemName: "chevron.up") }
+                        .help("Previous change (⌥⌘←)")
+                        .accessibilityLabel("Previous change")
+                        .disabled(changes.isEmpty || selectedIndex == 0)
+                    Button { details.moveChange(1) } label: { Image(systemName: "chevron.down") }
+                        .help("Next change (⌥⌘→)")
+                        .accessibilityLabel("Next change")
+                        .disabled(changes.isEmpty || selectedIndex == changes.count - 1)
+                }
+                .fixedSize()
+                Text(selectedIndex.map { "\($0 + 1) of \(changes.count)" }
+                     ?? "\(changes.count) \(changes.count == 1 ? "change" : "changes")")
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .fixedSize()
+                    .accessibilityLabel(selectedIndex.map { "Change \($0 + 1) of \(changes.count)" }
+                                        ?? "\(changes.count) \(changes.count == 1 ? "change" : "changes")")
+            }
+            .font(.callout)
+            FilePathView(repository: repository, file: file)
+                .frame(height: 22)
+                .help(file.path)
+        }
+        .controlSize(.small)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(.bar)
     }
 }

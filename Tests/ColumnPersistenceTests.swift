@@ -20,18 +20,27 @@ struct ColumnPersistenceTests {
         let first = makeTable()
         let original = ColumnPersistenceView(defaults: defaults)
         original.connect(to: first)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.02))
         precondition(first.allowsColumnResizing)
         precondition(first.columnAutoresizingStyle == .noColumnAutoresizing)
         first.tableColumns[0].width = 246
         first.tableColumns[1].width = 803
-        NotificationCenter.default.post(name: NSTableView.columnDidResizeNotification, object: first)
         precondition(defaults.dictionary(forKey: "commitHistoryColumnWidths")?["Graph"] as? Double == 246)
+        precondition(defaults.dictionary(forKey: "commitHistoryColumnWidths")?["Commit"] as? Double == 803,
+                     "Direct column resizing must save without relying on AppKit's header notification")
 
         let reopened = makeTable()
         let restored = ColumnPersistenceView(defaults: defaults)
         restored.connect(to: reopened)
         precondition(reopened.tableColumns[0].width == 246)
         precondition(reopened.tableColumns[1].width == 803)
+        // Simulate SwiftUI's initial layout changing a column after the native table connects.
+        reopened.tableColumns[0].width = 120
+        NotificationCenter.default.post(name: NSTableView.columnDidResizeNotification, object: reopened)
+        precondition(defaults.dictionary(forKey: "commitHistoryColumnWidths")?["Graph"] as? Double == 246,
+                     "Initial layout must not overwrite the saved user width")
+        RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        precondition(reopened.tableColumns[0].width == 246, "Saved widths must be reapplied after initial layout")
         restored.connect(to: reopened)
         precondition(reopened.tableColumns[0].width == 246)
         let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 800, height: 120))

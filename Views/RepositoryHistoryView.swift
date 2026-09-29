@@ -41,7 +41,7 @@ struct RepositoryHistoryView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                NativeSplitView(isVertical: false, initialFirstSize: 0.4, minimumFirstSize: 150, minimumSecondSize: 240) {
+                NativeSplitView(isVertical: false, initialFirstSize: 0.4, minimumFirstSize: 150, minimumSecondSize: 240, persistenceKey: "commitHistoryPaneFraction") {
                     CommitTable(rows: store.rows, selectedCommitID: $store.selectedCommitID)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } second: {

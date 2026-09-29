@@ -32,6 +32,8 @@ final class ColumnPersistenceView: NSView {
     private weak var table: NSTableView?
     private var connectionScheduled = false
     private var requestedRow: Int?
+    private var restoringWidths = false
+    private var widthObservers: [NSKeyValueObservation] = []
 
     func requestSelectionReveal(_ row: Int?) {
         guard requestedRow != row else { return }
@@ -82,10 +84,35 @@ final class ColumnPersistenceView: NSView {
     func connect(to table: NSTableView) {
         guard self.table !== table else { return }
         NotificationCenter.default.removeObserver(self, name: NSTableView.columnDidResizeNotification, object: self.table)
+        widthObservers.removeAll()
         self.table = table
+        restoringWidths = true
         table.columnAutoresizingStyle = .noColumnAutoresizing
         table.allowsColumnResizing = true
         let widths = defaults.dictionary(forKey: Self.widthsKey) ?? [:]
+        restore(widths, to: table)
+        // SwiftUI finishes arranging its table after attaching the native backing view.
+        // Apply the saved widths after that pass, without saving those initial layout changes.
+        DispatchQueue.main.async { [weak self, weak table] in
+            guard let self, let table, self.table === table else { return }
+            table.window?.contentView?.layoutSubtreeIfNeeded()
+            self.restore(widths, to: table)
+            self.restoringWidths = false
+        }
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(columnsDidResize(_:)),
+            name: NSTableView.columnDidResizeNotification, object: table
+        )
+        // SwiftUI's header resizing can set NSTableColumn.width without the table's resize notification.
+        widthObservers = table.tableColumns.map { column in
+            column.observe(\.width, options: [.new]) { [weak self] _, _ in
+                MainActor.assumeIsolated { self?.saveWidths() }
+            }
+        }
+        revealRequestedSelection()
+    }
+
+    private func restore(_ widths: [String: Any], to table: NSTableView) {
         for (index, column) in table.tableColumns.enumerated() {
             column.resizingMask = .userResizingMask
             if let width = widths[Self.columnNames[index]] as? NSNumber,
@@ -93,15 +120,14 @@ final class ColumnPersistenceView: NSView {
                 column.width = min(column.maxWidth, max(column.minWidth, CGFloat(width.doubleValue)))
             }
         }
-        NotificationCenter.default.addObserver(
-            self, selector: #selector(columnsDidResize(_:)),
-            name: NSTableView.columnDidResizeNotification, object: table
-        )
-        revealRequestedSelection()
     }
 
     @objc private func columnsDidResize(_ notification: Notification) {
-        guard let table else { return }
+        saveWidths()
+    }
+
+    private func saveWidths() {
+        guard !restoringWidths, let table else { return }
         let widths = Dictionary(uniqueKeysWithValues: table.tableColumns.enumerated().map { index, column in
             (Self.columnNames[index], Double(column.width))
         })
