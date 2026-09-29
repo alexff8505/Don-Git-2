@@ -50,8 +50,15 @@ struct GitRepositoryScanner {
         process.standardOutput = outputPipe
         process.standardError = FileHandle.nullDevice
 
+        // A saved folder can be unavailable (for example, while cloud storage is
+        // resolving it). Do not let that folder block the entire repository list.
+        let finished = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in finished.signal() }
         try process.run()
-        process.waitUntilExit()
+        guard finished.wait(timeout: .now() + 3) == .success else {
+            process.terminate()
+            return ""
+        }
 
         guard process.terminationStatus == 0 else {
             return ""

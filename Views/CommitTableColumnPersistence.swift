@@ -14,7 +14,19 @@ struct CommitTableColumnPersistence: NSViewRepresentable {
 
 final class ColumnPersistenceView: NSView {
     private static let widthsKey = "commitHistoryColumnWidths"
-    private static let columnNames: Set<String> = ["Graph", "Commit", "Hash", "Author", "Date"]
+    private static let columnNames = ["Graph", "Commit", "Hash", "Author", "Date"]
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) {
+        defaults = .standard
+        super.init(coder: coder)
+    }
+
     private weak var table: NSTableView?
     private var connectionScheduled = false
 
@@ -40,7 +52,7 @@ final class ColumnPersistenceView: NSView {
 
     private func findHistoryTable(in view: NSView) -> NSTableView? {
         if let table = view as? NSTableView,
-           Set(table.tableColumns.map { $0.headerCell.stringValue }) == Self.columnNames {
+           table.tableColumns.count == Self.columnNames.count {
             return table
         }
         for child in view.subviews {
@@ -49,15 +61,16 @@ final class ColumnPersistenceView: NSView {
         return nil
     }
 
-    private func connect(to table: NSTableView) {
+    func connect(to table: NSTableView) {
         guard self.table !== table else { return }
         NotificationCenter.default.removeObserver(self, name: NSTableView.columnDidResizeNotification, object: self.table)
         self.table = table
         table.columnAutoresizingStyle = .noColumnAutoresizing
-        let widths = UserDefaults.standard.dictionary(forKey: Self.widthsKey) ?? [:]
-        for column in table.tableColumns {
+        table.allowsColumnResizing = true
+        let widths = defaults.dictionary(forKey: Self.widthsKey) ?? [:]
+        for (index, column) in table.tableColumns.enumerated() {
             column.resizingMask = .userResizingMask
-            if let width = widths[column.headerCell.stringValue] as? NSNumber,
+            if let width = widths[Self.columnNames[index]] as? NSNumber,
                width.doubleValue.isFinite {
                 column.width = min(column.maxWidth, max(column.minWidth, CGFloat(width.doubleValue)))
             }
@@ -66,13 +79,14 @@ final class ColumnPersistenceView: NSView {
             self, selector: #selector(columnsDidResize(_:)),
             name: NSTableView.columnDidResizeNotification, object: table
         )
+
     }
 
     @objc private func columnsDidResize(_ notification: Notification) {
         guard let table else { return }
-        let widths = Dictionary(uniqueKeysWithValues: table.tableColumns.map {
-            ($0.headerCell.stringValue, Double($0.width))
+        let widths = Dictionary(uniqueKeysWithValues: table.tableColumns.enumerated().map { index, column in
+            (Self.columnNames[index], Double(column.width))
         })
-        UserDefaults.standard.set(widths, forKey: Self.widthsKey)
+        defaults.set(widths, forKey: Self.widthsKey)
     }
 }
