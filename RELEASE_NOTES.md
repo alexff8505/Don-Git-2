@@ -36,6 +36,7 @@ Updated **30 September 2026**. These improvements are available on `main`.
 
 ### Keep the macOS feel
 
+- Fixed disconnected branch lines when Git collapses a lane across consecutive commit and routing rows.
 - Added **System**, **Light**, and **Dark** appearance choices in the native Settings window, applied immediately and remembered across launches.
 - Used system backgrounds, source lists, toolbar controls, and standard AppKit splitters, with stable pane geometry as selections change.
 - Adopted separate native toolbar groups on macOS 26 and later, including Golden Gate, while retaining macOS 15 support.

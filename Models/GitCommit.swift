@@ -47,6 +47,8 @@ struct CommitRow: Identifiable, Hashable, Sendable {
 // Each line is emitted by Git's graph renderer, including merge and collapse rows.
 struct CommitGraphState: Hashable, Sendable {
     let lines: [[GitGraphGlyph]]
+    let previousLine: [GitGraphGlyph]
+    let nextLine: [GitGraphGlyph]
     let hasParents: Bool
     let incomingColor: [Int]?
     let outgoingColor: [Int]?

@@ -38,7 +38,10 @@ struct CommitGraphBuilder {
             let nextLine = lines.count > 1 ? lines[1] : (index + 1 < blocks.count ? blocks[index + 1][0] : [])
             let outgoing = commit.parents.isEmpty ? nil : edgeColor(in: nextLine, column: nodeColumn, atBottom: false)
             return CommitRow(commit: commit, graph: CommitGraphState(
-                lines: lines, hasParents: !commit.parents.isEmpty,
+                lines: lines,
+                previousLine: index > 0 ? blocks[index - 1].last ?? [] : [],
+                nextLine: index + 1 < blocks.count ? blocks[index + 1][0] : [],
+                hasParents: !commit.parents.isEmpty,
                 incomingColor: incoming, outgoingColor: outgoing
             ))
         }

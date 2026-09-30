@@ -14,20 +14,21 @@ struct CommitGraphView: View {
             for (lineIndex, line) in graph.lines.enumerated() {
                 let top = lineIndex == 0 ? inset : size.height / 2 + (CGFloat(lineIndex) - 0.5) * unit
                 let bottom = size.height / 2 + (CGFloat(lineIndex) + 0.5) * unit
+                let previous = lineIndex > 0 ? graph.lines[lineIndex - 1] : graph.previousLine
+                let next = lineIndex + 1 < graph.lines.count ? graph.lines[lineIndex + 1] : graph.nextLine
                 for (column, glyph) in line.enumerated() {
                     let x = CGFloat(column) * 7 + 8
+                    let endpoints = CommitGraphGeometry.endpoints(column: column, line: line, previous: previous, next: next)
+                    let upperX = endpoints.upper.map { CGFloat($0) * 7 + 8 }
+                    let lowerX = endpoints.lower.map { CGFloat($0) * 7 + 8 }
                     let middle = lineIndex == 0 ? size.height / 2 : (top + bottom) / 2
                     var path = Path()
                     switch glyph.character {
-                    case "|":
-                        path.move(to: CGPoint(x: x, y: top))
-                        path.addLine(to: CGPoint(x: x, y: bottom))
-                    case "/":
-                        path.move(to: CGPoint(x: x + 7, y: top))
-                        path.addLine(to: CGPoint(x: x - 7, y: bottom))
-                    case "\\":
-                        path.move(to: CGPoint(x: x - 7, y: top))
-                        path.addLine(to: CGPoint(x: x + 7, y: bottom))
+                    case "|", "/", "\\":
+                        if let upperX, let lowerX {
+                            path.move(to: CGPoint(x: upperX, y: top))
+                            path.addLine(to: CGPoint(x: lowerX, y: bottom))
+                        }
                     case ".":
                         path.move(to: CGPoint(x: x - 7, y: middle))
                         path.addLine(to: CGPoint(x: x, y: middle))
@@ -58,20 +59,11 @@ struct CommitGraphView: View {
                     // Extend each boundary endpoint vertically, rather than extending
                     // diagonals beyond the row and relying on unclipped drawing.
                     var bridges = Path()
-                    let upperX: CGFloat?
-                    let lowerX: CGFloat?
-                    switch glyph.character {
-                    case "|": upperX = x; lowerX = x
-                    case "/": upperX = x + 7; lowerX = x - 7
-                    case "\\": upperX = x - 7; lowerX = x + 7
-                    case ".": upperX = nil; lowerX = x
-                    default: upperX = nil; lowerX = nil
-                    }
-                    if lineIndex == 0, let upperX {
+                    if lineIndex == 0, glyph.character != "*", let upperX {
                         bridges.move(to: CGPoint(x: upperX, y: 0))
                         bridges.addLine(to: CGPoint(x: upperX, y: inset))
                     }
-                    if lineIndex == graph.lines.count - 1, let lowerX {
+                    if lineIndex == graph.lines.count - 1, glyph.character != "*", let lowerX {
                         bridges.move(to: CGPoint(x: lowerX, y: contentBottom))
                         bridges.addLine(to: CGPoint(x: lowerX, y: size.height))
                     }
