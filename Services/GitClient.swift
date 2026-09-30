@@ -101,20 +101,22 @@ struct GitClient: Sendable {
 
         let arguments = [
             "log",
+            "--graph",
             "--all",
-            "--topo-order",
             "--decorate=short",
+            "--color=always",
             "--date=iso-strict",
-            "--format=%H%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D%x1e"
+            "--format=%x1f%H%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D"
         ]
 
-        let output = try runGit(arguments, in: repository.path)
-        let commits = try parseCommits(output)
-        // --graph implies topological ordering; use the same ordering for metadata.
-        let graphOutput = try runGit([
-            "log", "--graph", "--all", "--topo-order", "--color=always",
-            "--format=%x1f%H"
-        ], in: repository.path)
+        // One walk supplies both metadata and routing. This has the same default
+        // ordering and all-ref scope as log --graph --oneline --decorate --all.
+        let graphOutput = try runGit(arguments, in: repository.path)
+        let metadata = graphOutput.split(separator: "\n").compactMap { line -> String? in
+            guard let marker = line.firstIndex(of: "\u{1f}") else { return nil }
+            return String(line[line.index(after: marker)...])
+        }.joined(separator: "\u{1e}")
+        let commits = try parseCommits(metadata)
         return try CommitGraphBuilder().rows(for: commits, graphOutput: graphOutput)
     }
 

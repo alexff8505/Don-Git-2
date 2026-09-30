@@ -48,12 +48,15 @@ Switch repositories and return to the commit you were reviewing. Resized history
 
 - Add repositories through the standard macOS folder picker; any folder inside a Git working tree is accepted.
 - Give repository folders persistent colours and sort by name or most recent commit date.
-- Follow all branches and refs in a topological commit graph, with branch, remote, and tag badges.
+- Follow the routing and order of `git log --graph --oneline --decorate --all`, with branch, remote, and tag badges.
+- Read continuous coloured lanes, curved joins, and outlined merge nodes in both light and dark appearances. Crossings stay separate from parent junctions.
 - Read the current branch, commit count, and working-tree status in the bottom bar.
 - Refresh history from the native toolbar or File menu.
 - Stage and commit all local changes from a multiline commit sheet.
 
 Choose **System**, **Light**, or **Dark** in **Don Git 2 → Settings…** (⌘,). The choice applies immediately throughout the app and is remembered across launches. System follows your Mac’s appearance.
+
+Drag the **Graph** column divider to widen it for dense histories. An ellipsis marks rows with lanes outside the current column width.
 
 The interface follows native macOS conventions, including the macOS 26 / Golden Gate toolbar treatment, while retaining macOS 15 support.
 
@@ -80,5 +83,7 @@ bash script/test_diff_view.sh
 bash script/test_columns.sh
 bash script/test_repository_selection.sh
 ```
+
+To check every rendered parent connection in an existing repository, pass its path to `script/test_graph.sh`. This reads the repository without modifying it. Graph checks also compare ordering with the reference Git command, exercise real merges with up to four parents and interleaved roots, and measure native palette contrast.
 
 [Changelog](RELEASE_NOTES.md) · [Screenshot gallery](Docs/Screenshots/README.md)

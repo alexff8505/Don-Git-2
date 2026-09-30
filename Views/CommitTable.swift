@@ -8,12 +8,12 @@ struct CommitTable: View {
     var body: some View {
         Table(rows, selection: $selectedCommitID) {
             TableColumn("Graph") { row in
-                CommitGraphView(graph: row.graph)
+                CommitGraphView(graph: row.graph, isSelected: row.id == selectedCommitID)
                     .frame(height: rowHeight(for: row) + CommitTableMetrics.graphVerticalBleed * 2)
                     .offset(y: -CommitTableMetrics.graphVerticalBleed)
                     .frame(height: rowHeight(for: row), alignment: .top)
             }
-            .width(min: 42, ideal: 96, max: 2_000)
+            .width(min: 42, ideal: 96, max: max(2_000, graphWidth))
 
             TableColumn("Commit") { row in
                 CommitSummaryCell(row: row)
@@ -59,6 +59,10 @@ struct CommitTable: View {
 
     private func rowHeight(for row: CommitRow) -> CGFloat {
         max(CommitTableMetrics.rowHeight, CGFloat(row.graph.lines.count) * 18)
+    }
+
+    private var graphWidth: CGFloat {
+        max(42, CGFloat(rows.map(\.graph.laneCount).max() ?? 1) * 16 + 12)
     }
 
 }

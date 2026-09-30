@@ -49,9 +49,11 @@ struct CommitGraphState: Hashable, Sendable {
     let lines: [[GitGraphGlyph]]
     let previousLine: [GitGraphGlyph]
     let nextLine: [GitGraphGlyph]
-    let hasParents: Bool
+    let parentCount: Int
     let incomingColor: [Int]?
     let outgoingColor: [Int]?
+
+    var nodeColor: [Int] { incomingColor ?? outgoingColor ?? [34] }
 
     var laneCount: Int {
         ((lines.map(\.count).max() ?? 1) + 1) / 2

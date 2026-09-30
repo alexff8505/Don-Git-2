@@ -2,77 +2,121 @@ import SwiftUI
 
 struct CommitGraphView: View {
     let graph: CommitGraphState
+    var isSelected = false
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
-        Canvas { context, size in
-            // Keep all diagonals inside the cell. Only vertical endpoints bleed into
-            // the native table's inter-row spacing, so clipping cannot truncate joins.
+        let scheme = colorScheme
+        let increasedContrast = contrast == .increased
+        return Canvas { context, size in
+            var colors: [[Int]: Color] = [:]
+            func color(for codes: [Int]) -> Color {
+                if let cached = colors[codes] { return cached }
+                let value = GitGraphColorPalette.color(for: codes, scheme: scheme,
+                                                       increasedContrast: increasedContrast)
+                colors[codes] = value
+                return value
+            }
             let inset: CGFloat = 7
-            let contentBottom = size.height - inset
             let center = size.height / 2
-            let unit = (contentBottom - center) / (CGFloat(max(1, graph.lines.count)) - 0.5)
-            for (lineIndex, line) in graph.lines.enumerated() {
-                let top = lineIndex == 0 ? inset : size.height / 2 + (CGFloat(lineIndex) - 0.5) * unit
-                let bottom = size.height / 2 + (CGFloat(lineIndex) + 0.5) * unit
-                let previous = lineIndex > 0 ? graph.lines[lineIndex - 1] : graph.previousLine
-                let next = lineIndex + 1 < graph.lines.count ? graph.lines[lineIndex + 1] : graph.nextLine
-                for (column, glyph) in line.enumerated() {
-                    let x = CGFloat(column) * 7 + 8
-                    let endpoints = CommitGraphGeometry.endpoints(column: column, line: line, previous: previous, next: next)
-                    let upperX = endpoints.upper.map { CGFloat($0) * 7 + 8 }
-                    let lowerX = endpoints.lower.map { CGFloat($0) * 7 + 8 }
-                    let middle = lineIndex == 0 ? size.height / 2 : (top + bottom) / 2
-                    var path = Path()
-                    switch glyph.character {
-                    case "|", "/", "\\":
-                        if let upperX, let lowerX {
-                            path.move(to: CGPoint(x: upperX, y: top))
-                            path.addLine(to: CGPoint(x: lowerX, y: bottom))
-                        }
-                    case ".":
-                        path.move(to: CGPoint(x: x - 7, y: middle))
-                        path.addLine(to: CGPoint(x: x, y: middle))
-                        path.addLine(to: CGPoint(x: x, y: bottom))
-                    case "_", "-":
-                        let y = glyph.character == "_" ? bottom : middle
-                        path.move(to: CGPoint(x: x - 7, y: y))
-                        path.addLine(to: CGPoint(x: x + 7, y: y))
-                    case "*":
-                        // Git's star is neutral; the coloured edges carry lane identity.
-                        if let color = graph.incomingColor {
-                            var incoming = Path()
-                            incoming.move(to: CGPoint(x: x, y: 0))
-                            incoming.addLine(to: CGPoint(x: x, y: middle))
-                            context.stroke(incoming, with: .color(GitGraphColorPalette.color(for: color)), lineWidth: 1.5)
-                        }
-                        if let color = graph.outgoingColor {
-                            var outgoing = Path()
-                            outgoing.move(to: CGPoint(x: x, y: middle))
-                            outgoing.addLine(to: CGPoint(x: x, y: lineIndex == graph.lines.count - 1 ? size.height : bottom))
-                            context.stroke(outgoing, with: .color(GitGraphColorPalette.color(for: color)), lineWidth: 1.5)
-                        }
-                        let node = Path(ellipseIn: CGRect(x: x - 3, y: middle - 3, width: 6, height: 6))
-                        context.fill(node, with: .color(.primary))
-                    default:
-                        continue
-                    }
-                    // Extend each boundary endpoint vertically, rather than extending
-                    // diagonals beyond the row and relying on unclipped drawing.
-                    var bridges = Path()
-                    if lineIndex == 0, glyph.character != "*", let upperX {
-                        bridges.move(to: CGPoint(x: upperX, y: 0))
-                        bridges.addLine(to: CGPoint(x: upperX, y: inset))
-                    }
-                    if lineIndex == graph.lines.count - 1, glyph.character != "*", let lowerX {
-                        bridges.move(to: CGPoint(x: lowerX, y: contentBottom))
-                        bridges.addLine(to: CGPoint(x: lowerX, y: size.height))
-                    }
-                    context.stroke(bridges, with: .color(GitGraphColorPalette.color(for: glyph.color)), lineWidth: 1.5)
-                    context.stroke(path, with: .color(GitGraphColorPalette.color(for: glyph.color)),
-                                   style: StrokeStyle(lineWidth: 1.5, lineCap: .butt, lineJoin: .miter))
+            let unit = (size.height - inset - center) / (CGFloat(max(1, graph.lines.count)) - 0.5)
+            func point(_ value: GitGraphPoint) -> CGPoint {
+                let y = value.line <= 0.5
+                    ? inset + CGFloat(value.line) * 2 * (center - inset)
+                    : center + (CGFloat(value.line) - 0.5) * unit
+                return CGPoint(x: CGFloat(value.column) * 8 + 10, y: y)
+            }
+            let stroke = StrokeStyle(lineWidth: increasedContrast ? 2.4 : 1.8,
+                                     lineCap: .round, lineJoin: .round)
+            let casing = StrokeStyle(lineWidth: stroke.lineWidth + 2, lineCap: .round, lineJoin: .round)
+            let background = Color(nsColor: .controlBackgroundColor)
+            let outgoingPorts = Set(graph.nextLine.indices.compactMap {
+                CommitGraphGeometry.endpoints(column: $0, line: graph.nextLine, previous: graph.lines.last ?? [], next: []).upper
+            })
+            var paths: [(path: Path, start: CGPoint, end: CGPoint, color: [Int])] = []
+            for segment in CommitGraphGeometry.segments(for: graph) {
+                let start = point(segment.start), end = point(segment.end)
+                var path = Path()
+                // Boundary extensions stay vertical and share exact coordinates
+                // with adjacent cells, including the native table's row spacing.
+                if segment.start.line == 0 {
+                    path.move(to: CGPoint(x: start.x, y: 0))
+                    path.addLine(to: start)
+                } else if segment.start.line == Double(graph.lines.count), outgoingPorts.contains(segment.start.column) {
+                    path.move(to: CGPoint(x: start.x, y: size.height))
+                    path.addLine(to: start)
+                } else {
+                    path.move(to: start)
+                }
+                if start.x != end.x, start.y != end.y {
+                    let bend = (end.y - start.y) * 0.45
+                    path.addCurve(to: end,
+                        control1: CGPoint(x: start.x, y: start.y + bend),
+                        control2: CGPoint(x: end.x, y: end.y - bend))
+                } else {
+                    path.addLine(to: end)
+                }
+                if segment.end.line == Double(graph.lines.count), outgoingPorts.contains(segment.end.column) {
+                    path.addLine(to: CGPoint(x: end.x, y: size.height))
+                }
+                paths.append((path, start, end, segment.color))
+            }
+            // Lay selected-row casings underneath every coloured stroke. Drawing
+            // them one segment at a time would erase the adjoining branch ends.
+            if isSelected {
+                for item in paths { context.stroke(item.path, with: .color(background), style: casing) }
+            }
+            for item in paths { context.stroke(item.path, with: .color(color(for: item.color)), style: stroke) }
+            for item in paths where item.start.x != item.end.x {
+                if paths.contains(where: { crosses(item.start, item.end, $0.start, $0.end) }) {
+                    // Keep junction endpoints solid; clear only the interior of
+                    // a path that crosses another lane without connecting to it.
+                    let interior = item.path.trimmedPath(from: 0.08, to: 0.92)
+                    context.stroke(interior, with: .color(background), style: casing)
+                    context.stroke(interior, with: .color(color(for: item.color)), style: stroke)
                 }
             }
+            if let column = graph.lines[graph.nodeLine].firstIndex(where: { $0.character == "*" }) {
+                let position = point(GitGraphPoint(column: Double(column), line: Double(graph.nodeLine) + 0.5))
+                let radius: CGFloat = graph.parentCount > 1 ? 4 : 3.3
+                let node = Path(ellipseIn: CGRect(x: position.x - radius, y: position.y - radius,
+                                                width: radius * 2, height: radius * 2))
+                let nodeColor = color(for: graph.nodeColor)
+                if isSelected {
+                    let halo = Path(ellipseIn: CGRect(x: position.x - radius - 1.5, y: position.y - radius - 1.5,
+                                                     width: radius * 2 + 3, height: radius * 2 + 3))
+                    context.fill(halo, with: .color(background))
+                }
+                context.fill(node, with: .color(graph.parentCount > 1 ? Color(nsColor: .controlBackgroundColor) : nodeColor))
+                context.stroke(node, with: .color(nodeColor), lineWidth: graph.parentCount > 1 ? 2 : 1)
+            }
+            if CGFloat(graph.laneCount) * 16 + 4 > size.width {
+                let marker = CGRect(x: size.width - 16, y: center - 8, width: 16, height: 16)
+                context.fill(Path(roundedRect: marker, cornerRadius: 3), with: .color(Color(nsColor: .controlBackgroundColor)))
+                context.draw(Text("…").font(.caption).foregroundStyle(.secondary), at: CGPoint(x: marker.midX, y: marker.midY))
+            }
         }
-        .accessibilityLabel(graph.hasParents ? "Commit with parent connections" : "Root commit")
+        .clipped()
+        .help("\(accessibilityDescription). Drag the Graph column divider to see more lanes.")
+        .accessibilityLabel(accessibilityDescription)
     }
+
+    private var accessibilityDescription: String {
+        let kind = graph.parentCount == 0 ? "Root commit" : graph.parentCount > 1 ? "Merge commit, \(graph.parentCount) parents" : "Commit, 1 parent"
+        let column = graph.lines[graph.nodeLine].firstIndex { $0.character == "*" } ?? 0
+        return "\(kind), lane \(column / 2 + 1) of \(graph.laneCount)"
+    }
+}
+
+/// Crossings lie inside both segments; a shared endpoint is a junction.
+private func crosses(_ a: CGPoint, _ b: CGPoint, _ c: CGPoint, _ d: CGPoint) -> Bool {
+    let ab = CGPoint(x: b.x - a.x, y: b.y - a.y)
+    let cd = CGPoint(x: d.x - c.x, y: d.y - c.y)
+    let denominator = ab.x * cd.y - ab.y * cd.x
+    guard abs(denominator) > 0.001 else { return false }
+    let ac = CGPoint(x: c.x - a.x, y: c.y - a.y)
+    let t = (ac.x * cd.y - ac.y * cd.x) / denominator
+    let u = (ac.x * ab.y - ac.y * ab.x) / denominator
+    return t > 0.001 && t < 0.999 && u > 0.001 && u < 0.999
 }

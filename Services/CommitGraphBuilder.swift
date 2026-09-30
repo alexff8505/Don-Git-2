@@ -10,7 +10,7 @@ struct CommitGraphBuilder {
         for line in graphOutput.split(separator: "\n", omittingEmptySubsequences: false) {
             if let marker = line.firstIndex(of: "\u{1f}") {
                 let prefix = String(line[..<marker])
-                let hash = String(line[line.index(after: marker)...])
+                let hash = String(line[line.index(after: marker)...].split(separator: "\u{1f}", omittingEmptySubsequences: false)[0])
                 guard hashes.count < commits.count, commits[hashes.count].hash == hash else {
                     throw GitClient.GitClientError.invalidOutput
                 }
@@ -30,31 +30,52 @@ struct CommitGraphBuilder {
         }
 
         guard hashes.count == commits.count else { throw GitClient.GitClientError.invalidOutput }
-        return commits.enumerated().map { index, commit in
+        var rows: [CommitRow] = []
+        for (index, commit) in commits.enumerated() {
             let lines = blocks[index]
             let nodeColumn = lines[0].firstIndex { $0.character == "*" } ?? 0
-            let incoming: [Int]? = index > 0
-                ? edgeColor(in: blocks[index - 1].last ?? [], column: nodeColumn, atBottom: true, allowStar: !commits[index - 1].parents.isEmpty) : nil
+            let previous = index > 0 ? blocks[index - 1].last ?? [] : []
+            let incoming = edgeColor(in: previous, column: nodeColumn, atBottom: true,
+                starColor: index > 0 ? rows[index - 1].graph.outgoingColor : nil)
             let nextLine = lines.count > 1 ? lines[1] : (index + 1 < blocks.count ? blocks[index + 1][0] : [])
-            let outgoing = commit.parents.isEmpty ? nil : edgeColor(in: nextLine, column: nodeColumn, atBottom: false)
-            return CommitRow(commit: commit, graph: CommitGraphState(
+            let outgoing = commit.parents.isEmpty ? nil : edgeColor(in: nextLine, column: nodeColumn, atBottom: false,
+                starColor: incoming ?? followingColor(blocks: blocks, after: index, column: nodeColumn) ?? [34])
+            rows.append(CommitRow(commit: commit, graph: CommitGraphState(
                 lines: lines,
-                previousLine: index > 0 ? blocks[index - 1].last ?? [] : [],
+                previousLine: previous,
                 nextLine: index + 1 < blocks.count ? blocks[index + 1][0] : [],
-                hasParents: !commit.parents.isEmpty,
+                parentCount: commit.parents.count,
                 incomingColor: incoming, outgoingColor: outgoing
-            ))
+            )))
         }
+        return rows
     }
 
-    private func edgeColor(in line: [GitGraphGlyph], column: Int, atBottom: Bool, allowStar: Bool = true) -> [Int]? {
+    private func followingColor(blocks: [[[GitGraphGlyph]]], after index: Int, column: Int) -> [Int]? {
+        // A neutral '*' inherits the lane colour. Look beyond a run of stars
+        // only when there is no incoming lane yet (for example, a new tip).
+        for block in blocks[index...] {
+            for line in block {
+                if let color = edgeColor(in: line, column: column, atBottom: false, starColor: nil) {
+                    return color
+                }
+                guard line.indices.contains(column), line[column].character == "*" else { return nil }
+            }
+        }
+        return nil
+    }
+
+    private func edgeColor(in line: [GitGraphGlyph], column: Int, atBottom: Bool, starColor: [Int]?) -> [Int]? {
         for (index, glyph) in line.enumerated() {
             let endpoint: Int
             switch glyph.character {
             case "|": endpoint = index
-            case "*" where allowStar: endpoint = index
+            case "*":
+                if index == column { return starColor }
+                continue
             case "/": endpoint = index + (atBottom ? -1 : 1)
             case "\\": endpoint = index + (atBottom ? 1 : -1)
+            case "." where atBottom: endpoint = index
             default: continue
             }
             if endpoint == column { return glyph.color }

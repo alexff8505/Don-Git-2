@@ -36,6 +36,10 @@ Updated **30 September 2026**. These improvements are available on `main`.
 
 ### Keep the macOS feel
 
+- Matched the routing and commit order of `git log --graph --oneline --decorate --all` using a single history walk for graph, commit details, and decorations.
+- Carried Git's lane colours through commit dots and translated ordinary and bright ANSI hues into adaptive macOS colours with measured contrast in light, dark, and increased-contrast appearances.
+- Added curved joins, outlined merge nodes, complete multi-parent merge stems, and separate paths at crossings and long horizontal connectors.
+- Kept the Graph column resizable, with an ellipsis for lanes beyond its current width.
 - Fixed disconnected branch lines when Git collapses a lane across consecutive commit and routing rows.
 - Added **System**, **Light**, and **Dark** appearance choices in the native Settings window, applied immediately and remembered across launches.
 - Used system backgrounds, source lists, toolbar controls, and standard AppKit splitters, with stable pane geometry as selections change.
@@ -51,6 +55,7 @@ Updated **30 September 2026**. These improvements are available on `main`.
 
 ### Validation and screenshots
 
+- Added tests that trace the actual drawing segments to parent hashes, including three 48-commit interleaved histories and a four-parent merge. Verified all rendered parent connections in WTC, avail-admin, and Don Git 2.
 - Added focused checks for real Git commit changes, native diff rendering and wrapping, column persistence, and repository selection memory.
 - Verified repository switching and restart restoration in the live app.
 - Refreshed the [README](README.md) and [screenshot gallery](Docs/Screenshots/README.md) with three captures of the running app.
