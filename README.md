@@ -53,7 +53,9 @@ Switch repositories and return to the commit you were reviewing. Resized history
 - Refresh history from the native toolbar or File menu.
 - Stage and commit all local changes from a multiline commit sheet.
 
-The interface follows system appearance and native macOS conventions, including the macOS 26 / Golden Gate toolbar treatment, while retaining macOS 15 support.
+Choose **System**, **Light**, or **Dark** in **Don Git 2 → Settings…** (⌘,). The choice applies immediately throughout the app and is remembered across launches. System follows your Mac’s appearance.
+
+The interface follows native macOS conventions, including the macOS 26 / Golden Gate toolbar treatment, while retaining macOS 15 support.
 
 ## Build and run
 

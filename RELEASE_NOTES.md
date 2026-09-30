@@ -36,6 +36,7 @@ Updated **30 September 2026**. These improvements are available on `main`.
 
 ### Keep the macOS feel
 
+- Added **System**, **Light**, and **Dark** appearance choices in the native Settings window, applied immediately and remembered across launches.
 - Used system backgrounds, source lists, toolbar controls, and standard AppKit splitters, with stable pane geometry as selections change.
 - Adopted separate native toolbar groups on macOS 26 and later, including Golden Gate, while retaining macOS 15 support.
 - Removed the sidebar toggle from the toolbar.

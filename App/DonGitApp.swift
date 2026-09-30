@@ -6,10 +6,14 @@ struct DonGitApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var store = GitViewerStore()
+    @AppStorage(AppAppearance.defaultsKey) private var appearance: AppAppearance = .system
 
     var body: some Scene {
         WindowGroup {
             ContentView(store: store)
+                .onChange(of: appearance, initial: true) { _, appearance in
+                    appearance.apply()
+                }
                 .task {
                     await store.loadInitialData()
                     store.startAutoRefresh()
@@ -90,12 +94,24 @@ struct DonGitApp: App {
                 .disabled(store.selectedCommitID == nil)
             }
         }
+
+        Settings {
+            SettingsView(appearance: Binding {
+                appearance
+            } set: { selection in
+                appearance = selection
+                selection.apply()
+            })
+        }
     }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
+        let appearance = UserDefaults.standard.string(forKey: AppAppearance.defaultsKey)
+            .flatMap(AppAppearance.init(rawValue:)) ?? .system
+        appearance.apply()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
