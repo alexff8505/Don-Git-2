@@ -2,52 +2,74 @@ import SwiftUI
 
 struct CommitTable: View {
     let rows: [CommitRow]
+    var localChangesCount = 0
     @Binding var selectedCommitID: CommitRow.ID?
     @FocusState private var hasKeyboardFocus: Bool
 
     var body: some View {
-        Table(rows, selection: $selectedCommitID) {
+        Table(entries, selection: $selectedCommitID) {
             TableColumn("Graph") { row in
-                CommitGraphView(graph: row.graph, isSelected: row.id == selectedCommitID)
-                    .frame(height: rowHeight(for: row) + CommitTableMetrics.graphVerticalBleed * 2)
-                    .offset(y: -CommitTableMetrics.graphVerticalBleed)
-                    .frame(height: rowHeight(for: row), alignment: .top)
+                if let commit = row.commitRow {
+                    CommitGraphView(graph: commit.graph, isSelected: row.id == selectedCommitID,
+                                    hasWorkingTreeAbove: connectsWorkingTree && rows.first?.id == row.id)
+                        .frame(height: rowHeight(for: row) + CommitTableMetrics.graphVerticalBleed * 2)
+                        .offset(y: -CommitTableMetrics.graphVerticalBleed)
+                        .frame(height: rowHeight(for: row), alignment: .top)
+                } else {
+                    WorkingTreeGraphView(connectsToHEAD: connectsWorkingTree)
+                        .frame(height: CommitTableMetrics.rowHeight)
+                }
             }
             .width(min: 42, ideal: 96, max: max(2_000, graphWidth))
 
             TableColumn("Commit") { row in
-                CommitSummaryCell(row: row)
+                if let commit = row.commitRow {
+                    CommitSummaryCell(row: commit)
+                } else {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Uncommitted Changes").fontWeight(.medium)
+                        Text("\(localChangesCount) \(localChangesCount == 1 ? "file" : "files") · Not committed")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .help("Review staged edits, unstaged edits, and new files compared with HEAD")
+                    .accessibilityLabel("Uncommitted Changes, \(localChangesCount) files, not committed")
+                }
             }
             .width(min: 160, ideal: 420, max: 3_000)
 
             TableColumn("Hash") { row in
-                Text(row.commit.shortHash)
-                    .font(.system(.callout, design: .monospaced))
-                    .lineLimit(1)
+                if let commit = row.commitRow?.commit {
+                    Text(commit.shortHash)
+                        .font(.system(.callout, design: .monospaced))
+                        .lineLimit(1)
+                }
             }
             .width(min: 60, ideal: 96, max: 400)
 
             TableColumn("Author") { row in
-                HStack(spacing: 6) {
-                    Image(systemName: "person")
-                        .foregroundStyle(.secondary)
-                        .imageScale(.small)
-                        .accessibilityHidden(true)
-                    Text(row.commit.authorName)
-                        .lineLimit(1)
+                if let commit = row.commitRow?.commit {
+                    HStack(spacing: 6) {
+                        Image(systemName: "person")
+                            .foregroundStyle(.secondary)
+                            .imageScale(.small)
+                            .accessibilityHidden(true)
+                        Text(commit.authorName)
+                            .lineLimit(1)
+                    }
+                    .font(.callout)
                 }
-                .font(.callout)
             }
             .width(min: 80, ideal: 140, max: 1_000)
 
             TableColumn("Date") { row in
-                Text(DisplayFormatters.commitDate(row.commit.authoredAt))
-                    .lineLimit(1)
+                if let commit = row.commitRow?.commit {
+                    Text(DisplayFormatters.commitDate(commit.authoredAt)).lineLimit(1)
+                }
             }
             .width(min: 100, ideal: 164, max: 1_000)
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
-        .background(CommitTableColumnPersistence(selectedRowIndex: rows.firstIndex { $0.id == selectedCommitID }))
+        .background(CommitTableColumnPersistence(selectedRowIndex: entries.firstIndex { $0.id == selectedCommitID }))
         .focused($hasKeyboardFocus)
         .simultaneousGesture(TapGesture().onEnded {
             hasKeyboardFocus = true
@@ -57,14 +79,41 @@ struct CommitTable: View {
         }
     }
 
-    private func rowHeight(for row: CommitRow) -> CGFloat {
-        max(CommitTableMetrics.rowHeight, CGFloat(row.graph.lines.count) * 18)
+    private var entries: [HistoryEntry] {
+        (localChangesCount > 0 ? [.workingTree(localChangesCount)] : []) + rows.map(HistoryEntry.commit)
+    }
+
+    private var connectsWorkingTree: Bool {
+        localChangesCount > 0 && rows.first?.commit.refs.contains { $0.kind == .head } == true
+    }
+
+    private func rowHeight(for row: HistoryEntry) -> CGFloat {
+        max(CommitTableMetrics.rowHeight, CGFloat(row.commitRow?.graph.lines.count ?? 1) * 18)
     }
 
     private var graphWidth: CGFloat {
         max(42, CGFloat(rows.map(\.graph.laneCount).max() ?? 1) * 16 + 12)
     }
 
+}
+
+private struct WorkingTreeGraphView: View {
+    let connectsToHEAD: Bool
+
+    var body: some View {
+        Canvas { context, size in
+            let center = CGPoint(x: 10, y: size.height / 2)
+            if connectsToHEAD {
+                var stem = Path()
+                stem.move(to: CGPoint(x: center.x, y: center.y + 5))
+                stem.addLine(to: CGPoint(x: center.x, y: size.height + 7))
+                context.stroke(stem, with: .foreground, style: StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
+            }
+            context.stroke(Path(ellipseIn: CGRect(x: center.x - 5, y: center.y - 5, width: 10, height: 10)),
+                           with: .foreground, lineWidth: 1.5)
+        }
+        .accessibilityLabel("Uncommitted working tree, based on HEAD")
+    }
 }
 
 private enum CommitTableMetrics {

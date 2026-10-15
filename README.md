@@ -2,7 +2,7 @@
 
 **Native commit review, built for macOS.**
 
-Explore your local Git repositories, follow the commit graph, and see exactly what changed in each commit. Don Git 2 uses SwiftUI, AppKit, and standard macOS controls, with keyboard navigation and a workspace that remembers where you left off.
+Explore your Git repositories, follow current origin branch positions, and review both uncommitted edits and saved commits. Don Git 2 uses SwiftUI, AppKit, and standard macOS controls, with keyboard navigation and a workspace that remembers where you left off.
 
 ![Don Git 2 reviewing a commit in unified mode, with a native blue selection, changed files, path breadcrumbs, and code diffs](Docs/Screenshots/commit-diff-unified.jpg)
 
@@ -10,6 +10,8 @@ Explore your local Git repositories, follow the commit graph, and see exactly wh
 
 | Feature | What it does |
 | --- | --- |
+| **Uncommitted changes** | Review staged edits, unstaged edits, and new files from a clearly marked row above the commit history. Local previews refresh every three seconds. |
+| **Current origin branches** | Fetch origin automatically on opening a repository, returning to the app, and every minute, with visible check progress and freshness. |
 | **Changes per commit** | Select a commit to see its changed files, full message, and addition/deletion counts. |
 | **Two diff views** | Review one unified diff or compare before and after side by side, with synchronised vertical scrolling. |
 | **Keyboard navigation** | Move between repositories, commits, files, and changed blocks using native focus and shortcuts. |
@@ -27,6 +29,10 @@ A compact file toolbar keeps **Wrap Lines**, change counts, and previous/next co
 Compare merge commits against either parent, and root commits against an empty tree. Renames, deletions, additions, binary files, and metadata-only changes have explicit representations.
 
 ## Stay in the flow
+
+Select **Uncommitted Changes** at the top of the history to review staged edits, unstaged edits, and new files before committing. The hollow graph node and **Not committed** label distinguish the working tree from saved commits. Its file list and unified or side-by-side diff compare the current working copy with HEAD, including additions, deletions, renames, and binary files.
+
+Local changes refresh every three seconds while preserving the selected file. Origin checks run separately so a slow connection does not hold up local previews. Reviewing changes leaves your index and files unchanged. Repositories without a first commit compare against an empty tree; committing removes the uncommitted row and selects the new commit.
 
 Click the sidebar, commit history, or changed-file list to focus it. The selected row uses the native blue accent highlight on the pictured system, and arrow keys move through that list. The **Navigate** menu provides shortcuts for moving between panes and changes.
 
@@ -51,7 +57,9 @@ Switch repositories and return to the commit you were reviewing. Resized history
 - Follow the routing and order of `git log --graph --oneline --decorate --all`, with branch, remote, and tag badges.
 - Read continuous coloured lanes, curved joins, and outlined merge nodes in both light and dark appearances. Crossings stay separate from parent junctions.
 - Read the current branch, commit count, and working-tree status in the bottom bar.
-- Refresh history from the native toolbar or File menu.
+- Automatically fetch origin when opening a repository, returning to the app, and every minute. The graph shows the latest fetched origin branch positions, including new branches, force-pushes, and deletions.
+- Check origin immediately with **Refresh History** (⌘R). The bottom bar shows the last successful check, progress, or a connection/authentication failure; existing history stays available offline.
+- Origin checks only update remote-tracking branches and download history. They never pull, merge, switch branches, or alter local files. Repositories without origin continue to work locally.
 - Stage and commit all local changes from a multiline commit sheet.
 
 Choose **System**, **Light**, or **Dark** in **Don Git 2 → Settings…** (⌘,). The choice applies immediately throughout the app and is remembered across launches. System follows your Mac’s appearance.
@@ -74,7 +82,7 @@ The packaged app is written to `dist/Don Git 2.app`. Use `bash script/build_and_
 
 ## Checks
 
-The focused checks cover Git history and diffs, native rendering, column persistence, and repository selection memory:
+The focused checks cover origin refresh, uncommitted changes and index preservation, Git history and diffs, native rendering, column persistence, and repository selection memory:
 
 ```bash
 bash script/test_graph.sh
@@ -82,6 +90,8 @@ bash script/test_changes.sh
 bash script/test_diff_view.sh
 bash script/test_columns.sh
 bash script/test_repository_selection.sh
+bash script/test_origin_refresh.sh
+bash script/test_local_changes.sh
 ```
 
 To check every rendered parent connection in an existing repository, pass its path to `script/test_graph.sh`. This reads the repository without modifying it. Graph checks also compare ordering with the reference Git command, exercise real merges with up to four parents and interleaved roots, and measure native palette contrast.

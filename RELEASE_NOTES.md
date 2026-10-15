@@ -1,5 +1,32 @@
 # Changelog
 
+## 15 October 2026 — Origin refresh and uncommitted changes
+
+### Review uncommitted changes
+
+- Added an **Uncommitted Changes** row above commit history with a hollow node, file count, and **Not committed** label.
+- Reused the changed-file list, unified and side-by-side diffs, wrapping, and change navigation for current working-copy changes against HEAD.
+- Included staged and unstaged edits, new files, deleted and renamed files, binary files, and merge conflicts; ignored files remain excluded.
+- Explained staged edits whose working copy already matches HEAD instead of hiding them.
+- Refreshed local changes every three seconds independently of network fetches, preserving file and unchanged diff selections.
+- Supported repositories before their first commit and selected the new HEAD after committing reviewed changes.
+- Disabled Git's optional index writes and automatic diff index refresh during inspection; verified the real index remains byte-for-byte unchanged.
+- Added native history focus handling and focused local-change checks for index preservation, unusual paths, phantom stat changes, staging, live edits, committing, and conflicts.
+
+### Keep origin branches current
+
+- Fetch origin on repository selection, app activation, manual refresh, and every minute, independently of local history checks.
+- Show fetch progress, the last successful origin check, missing origin, and failures in the bottom bar without hiding local history.
+- Update remote markers for new branches, deleted branches, and force-pushes without changing local branches or files.
+- Keep background checks noninteractive, bound fetches to 30 seconds, and share overlapping requests for the same repository.
+- Show fetched remote history even when the local repository has no commits yet.
+
+### Validation
+
+- Added `script/test_local_changes.sh` and `script/test_origin_refresh.sh` with disposable Git repositories for real file changes, remote advances, force-pushes, branch deletions, overlapping requests, and connection failures.
+- Passed the packaged app build and checks for local changes, origin refresh, commit changes, repository selection, native diff rendering, column persistence, and graph topology.
+- Verified the selected layout, native history keyboard focus, and unified/side-by-side local diffs in the running app in light and dark appearances. See [design QA](design-qa.md) for the review record.
+
 ## Unreleased — Commit review and native macOS navigation
 
 Updated **30 September 2026**. These improvements are available on `main`.

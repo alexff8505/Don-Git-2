@@ -7,11 +7,14 @@ struct DiffCodeView: NSViewRepresentable {
     let presentation: DiffPresentation
     let selectedChangeID: Int?
     var wordWrap = false
+    var beforeTitle = "Before"
+    var afterTitle = "After"
 
     func makeNSView(context: Context) -> DiffContainerView { DiffContainerView() }
 
     func updateNSView(_ view: DiffContainerView, context: Context) {
-        view.update(diff: diff, presentation: presentation, selectedChangeID: selectedChangeID, wordWrap: wordWrap)
+        view.update(diff: diff, presentation: presentation, selectedChangeID: selectedChangeID, wordWrap: wordWrap,
+                    beforeTitle: beforeTitle, afterTitle: afterTitle)
     }
 }
 
@@ -27,6 +30,8 @@ final class DiffContainerView: NSView {
     private var synchronizingScroll = false
     private var wordWrap = false
     private var fittedWidths: [CGFloat] = []
+    private var beforeTitle = "Before"
+    private var afterTitle = "After"
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -53,12 +58,16 @@ final class DiffContainerView: NSView {
         if let displayedDiff, let presentation { render(displayedDiff, presentation: presentation) }
     }
 
-    func update(diff: FileDiff, presentation: DiffPresentation, selectedChangeID: Int?, wordWrap: Bool = false) {
+    func update(diff: FileDiff, presentation: DiffPresentation, selectedChangeID: Int?, wordWrap: Bool = false,
+                beforeTitle: String = "Before", afterTitle: String = "After") {
         let contentChanged = displayedDiff != diff || self.presentation != presentation || self.wordWrap != wordWrap
+            || self.beforeTitle != beforeTitle || self.afterTitle != afterTitle
         if contentChanged {
             displayedDiff = diff
             self.presentation = presentation
             self.wordWrap = wordWrap
+            self.beforeTitle = beforeTitle
+            self.afterTitle = afterTitle
             configurePanes(presentation)
             render(diff, presentation: presentation)
         }
@@ -102,8 +111,8 @@ final class DiffContainerView: NSView {
             split.isVertical = true
             split.dividerStyle = .thin
             split.autoresizingMask = [.width, .height]
-            let left = DiffTextPane(title: "Before", accessibilityName: "Before code changes")
-            let right = DiffTextPane(title: "After", accessibilityName: "After code changes")
+            let left = DiffTextPane(title: beforeTitle, accessibilityName: "\(beforeTitle) code changes")
+            let right = DiffTextPane(title: afterTitle, accessibilityName: "\(afterTitle) code changes")
             left.frame = NSRect(x: 0, y: 0, width: bounds.width / 2, height: bounds.height)
             right.frame = NSRect(x: bounds.width / 2, y: 0, width: bounds.width / 2, height: bounds.height)
             split.addArrangedSubview(left)

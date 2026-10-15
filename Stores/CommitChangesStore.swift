@@ -11,30 +11,42 @@ final class CommitChangesStore: ObservableObject {
     @Published private(set) var diffError: String?
     @Published var selectedFileID: String?
     @Published var selectedChangeID: Int?
+    @Published private(set) var revision = 0
 
     private let client = GitClient()
     private var generation = 0
     private var diffGeneration = 0
+    private var displayedDiffFileID: String?
 
     var selectedFile: CommitChangedFile? { changes?.files.first { $0.id == selectedFileID } }
 
-    func load(repository: GitRepository, commit: GitCommit, parent: String?) async {
+    func load(repository: GitRepository, commit: GitCommit?, parent: String? = nil) async {
         generation += 1
         diffGeneration += 1
         let request = generation
-        changes = nil
-        diff = nil
+        if commit != nil {
+            changes = nil
+            diff = nil
+            selectedFileID = nil
+            selectedChangeID = nil
+        }
         error = nil
         diffError = nil
-        selectedFileID = nil
-        selectedChangeID = nil
-        isLoading = true
+        isLoading = changes == nil
         isLoadingDiff = false
         do {
-            let result = try await client.loadChanges(repository: repository, commit: commit, parent: parent)
+            let result: CommitChanges
+            if let commit {
+                result = try await client.loadChanges(repository: repository, commit: commit, parent: parent)
+            } else {
+                result = try await client.loadWorkingTreeChanges(repository: repository)
+            }
             guard request == generation, !Task.isCancelled else { return }
+            let previousFileID = commit == nil ? selectedFileID : nil
             changes = result
-            selectedFileID = result.files.first?.id
+            let selection = result.files.first { $0.id == previousFileID }?.id ?? result.files.first?.id
+            if selectedFileID != selection { selectedFileID = selection }
+            revision += 1
             isLoading = false
         } catch {
             guard request == generation, !Task.isCancelled else { return }
@@ -43,22 +55,31 @@ final class CommitChangesStore: ObservableObject {
         }
     }
 
-    func loadDiff(repository: GitRepository, commit: GitCommit) async {
+    func loadDiff(repository: GitRepository, commit: GitCommit?) async {
         diffGeneration += 1
         let request = diffGeneration
         let changesRequest = generation
-        diff = nil
+        if commit != nil || displayedDiffFileID != selectedFileID {
+            diff = nil
+            selectedChangeID = nil
+        }
         diffError = nil
-        selectedChangeID = nil
         guard let changes, let file = selectedFile else {
             isLoadingDiff = false
             return
         }
-        isLoadingDiff = true
+        isLoadingDiff = diff == nil
         do {
-            let result = try await client.loadDiff(repository: repository, commit: commit, base: changes.baseRevision, file: file)
+            let result: FileDiff
+            if let commit {
+                result = try await client.loadDiff(repository: repository, commit: commit, base: changes.baseRevision, file: file)
+            } else {
+                result = try await client.loadWorkingTreeDiff(repository: repository, base: changes.baseRevision, file: file)
+            }
             guard request == diffGeneration, changesRequest == generation, !Task.isCancelled else { return }
+            if diff != result { selectedChangeID = nil }
             diff = result
+            displayedDiffFileID = file.id
             isLoadingDiff = false
         } catch {
             guard request == diffGeneration, changesRequest == generation, !Task.isCancelled else { return }

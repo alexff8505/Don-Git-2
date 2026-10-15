@@ -1,8 +1,31 @@
 import Foundation
 
 enum GitDiffParser {
+    static func workingTreeEntries(_ output: String) throws -> [WorkingTreeEntry] {
+        let tokens = output.split(separator: "\0", omittingEmptySubsequences: false)
+        var entries: [WorkingTreeEntry] = []
+        var index = 0
+        while index < tokens.count, !tokens[index].isEmpty {
+            let token = tokens[index]
+            guard token.count >= 4, token[token.index(token.startIndex, offsetBy: 2)] == " " else {
+                throw GitClient.GitClientError.invalidOutput
+            }
+            let status = String(token.prefix(2))
+            let path = String(token.dropFirst(3))
+            index += 1
+            var previous: String?
+            if status.contains("R") || status.contains("C") {
+                guard index < tokens.count, !tokens[index].isEmpty else { throw GitClient.GitClientError.invalidOutput }
+                previous = String(tokens[index])
+                index += 1
+            }
+            entries.append(WorkingTreeEntry(status: status, path: path, previousPath: previous))
+        }
+        return entries
+    }
+
     /// Git's -z formats preserve tabs, newlines, spaces, and Unicode in file names.
-    static func files(statusOutput: String, statOutput: String) throws -> [CommitChangedFile] {
+    static func files(statusOutput: String, statOutput: String, allowsUnchangedFiles: Bool = false) throws -> [CommitChangedFile] {
         let statusTokens = statusOutput.split(separator: "\0", omittingEmptySubsequences: false)
         var paths: [(status: String, path: String, previous: String?)] = []
         var index = 0
@@ -41,7 +64,11 @@ enum GitDiffParser {
             stats[path] = (Int(fields[0]), Int(fields[1]))
         }
         return try paths.map { entry in
-            guard let counts = stats[entry.path] else { throw GitClient.GitClientError.invalidOutput }
+            // Without refreshing the index, --name-status can report a dirty stat
+            // entry whose content matches HEAD and therefore has no --numstat row.
+            guard let counts = stats[entry.path] ?? (allowsUnchangedFiles ? (0, 0) : nil) else {
+                throw GitClient.GitClientError.invalidOutput
+            }
             return CommitChangedFile(path: entry.path, previousPath: entry.previous, status: entry.status,
                                      additions: counts.0, deletions: counts.1)
         }

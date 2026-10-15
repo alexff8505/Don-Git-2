@@ -3,6 +3,7 @@ import SwiftUI
 struct CommitGraphView: View {
     let graph: CommitGraphState
     var isSelected = false
+    var hasWorkingTreeAbove = false
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -83,6 +84,13 @@ struct CommitGraphView: View {
                 let node = Path(ellipseIn: CGRect(x: position.x - radius, y: position.y - radius,
                                                 width: radius * 2, height: radius * 2))
                 let nodeColor = color(for: graph.nodeColor)
+                if hasWorkingTreeAbove {
+                    var workingTreeStem = Path()
+                    workingTreeStem.move(to: CGPoint(x: position.x, y: 0))
+                    workingTreeStem.addLine(to: position)
+                    context.stroke(workingTreeStem, with: .color(.secondary),
+                                   style: StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
+                }
                 if isSelected {
                     let halo = Path(ellipseIn: CGRect(x: position.x - radius - 1.5, y: position.y - radius - 1.5,
                                                      width: radius * 2 + 3, height: radius * 2 + 3))

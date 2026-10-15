@@ -15,8 +15,8 @@ struct DonGitApp: App {
                     appearance.apply()
                 }
                 .task {
-                    await store.loadInitialData()
                     store.startAutoRefresh()
+                    await store.loadInitialData()
                 }
                 .onChange(of: scenePhase) { _, phase in
                     guard phase == .active else { return }
@@ -52,7 +52,7 @@ struct DonGitApp: App {
                     NotificationCenter.default.post(name: .focusCommitHistory, object: nil)
                 }
                 .keyboardShortcut("1")
-                .disabled(store.rows.isEmpty || store.isLoadingHistory)
+                .disabled(store.historyEntries.isEmpty || store.isLoadingHistory)
                 Button("Focus Changed Files") {
                     NotificationCenter.default.post(name: .focusChangedFiles, object: nil)
                 }
@@ -66,10 +66,10 @@ struct DonGitApp: App {
                 Divider()
                 Button("Previous Commit") { store.moveCommit(-1) }
                     .keyboardShortcut(.upArrow, modifiers: [.command, .control])
-                    .disabled(store.rows.isEmpty || store.isLoadingHistory)
+                    .disabled(store.historyEntries.isEmpty || store.isLoadingHistory)
                 Button("Next Commit") { store.moveCommit(1) }
                     .keyboardShortcut(.downArrow, modifiers: [.command, .control])
-                    .disabled(store.rows.isEmpty || store.isLoadingHistory)
+                    .disabled(store.historyEntries.isEmpty || store.isLoadingHistory)
                 Divider()
                 Button("Previous Changed File") {
                     NotificationCenter.default.post(name: .navigateChangedFile, object: -1)

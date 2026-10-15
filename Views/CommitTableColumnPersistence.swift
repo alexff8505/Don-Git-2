@@ -22,6 +22,7 @@ final class ColumnPersistenceView: NSView {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         super.init(frame: .zero)
+        NotificationCenter.default.addObserver(self, selector: #selector(focusHistory), name: .focusCommitHistory, object: nil)
     }
 
     required init?(coder: NSCoder) {
@@ -34,6 +35,11 @@ final class ColumnPersistenceView: NSView {
     private var requestedRow: Int?
     private var restoringWidths = false
     private var widthObservers: [NSKeyValueObservation] = []
+
+    @objc private func focusHistory() {
+        guard let table, let window = table.window, window.isKeyWindow else { return }
+        window.makeFirstResponder(table)
+    }
 
     func requestSelectionReveal(_ row: Int?) {
         guard requestedRow != row else { return }

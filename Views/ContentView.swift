@@ -32,7 +32,7 @@ struct ContentView: View {
                 }
                 .disabled(store.selectedRepository == nil || store.isLoadingHistory || store.isCommitting || isRefreshing)
                 .accessibilityLabel("Refresh History")
-                .help("Refresh history (⌘R)")
+                .help("Fetch the latest origin branches and refresh history (⌘R)")
             }
 
             if #available(macOS 26.0, *) {
@@ -45,7 +45,7 @@ struct ContentView: View {
                 } label: {
                     Label("Commit…", systemImage: "square.and.pencil")
                 }
-                .disabled(store.selectedRepository == nil || store.localChangesCount == 0 || store.isLoadingHistory || store.isCommitting)
+                .disabled(store.selectedRepository == nil || store.localChangesCount == 0 || store.localChangesError != nil || store.isLoadingHistory || store.isCommitting)
                 .help("Commit all local changes")
                 .accessibilityValue("\(store.localChangesCount) local changes")
             }
@@ -203,7 +203,7 @@ private struct CommitSheet: View {
                 .keyboardShortcut(.return, modifiers: .command)
                 .buttonStyle(.borderedProminent)
                 .help("Commit changes (⌘Return)")
-                .disabled(message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || store.localChangesCount == 0 || isSubmitting || store.isCommitting)
+                .disabled(message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || store.localChangesCount == 0 || store.localChangesError != nil || isSubmitting || store.isCommitting)
             }
         }
         .padding(24)

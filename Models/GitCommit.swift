@@ -44,6 +44,25 @@ struct CommitRow: Identifiable, Hashable, Sendable {
     }
 }
 
+/// A working tree is selectable alongside commits, without pretending to be one.
+enum HistoryEntry: Identifiable {
+    static let workingTreeID = "working-tree"
+    case workingTree(Int)
+    case commit(CommitRow)
+
+    var id: String {
+        switch self {
+        case .workingTree: Self.workingTreeID
+        case .commit(let row): row.id
+        }
+    }
+
+    var commitRow: CommitRow? {
+        if case .commit(let row) = self { return row }
+        return nil
+    }
+}
+
 // Each line is emitted by Git's graph renderer, including merge and collapse rows.
 struct CommitGraphState: Hashable, Sendable {
     let lines: [[GitGraphGlyph]]

@@ -22,6 +22,8 @@ struct CommitChangedFile: Identifiable, Hashable, Sendable {
         case "R": "Renamed"
         case "C": "Copied"
         case "T": "Type changed"
+        case "U": "Unmerged"
+        case "S": "Staged changes"
         default: "Modified"
         }
     }
@@ -31,9 +33,18 @@ struct CommitChanges: Sendable {
     let baseRevision: String
     let files: [CommitChangedFile]
     let message: String
+    var baseLabel: String = "Parent"
 
     var additions: Int { files.compactMap(\.additions).reduce(0, +) }
     var deletions: Int { files.compactMap(\.deletions).reduce(0, +) }
+}
+
+struct WorkingTreeEntry: Sendable {
+    let status: String
+    let path: String
+    let previousPath: String?
+    var isUntracked: Bool { status == "??" }
+    var isUnmerged: Bool { status.contains("U") || status == "AA" || status == "DD" }
 }
 
 struct DiffLine: Identifiable, Hashable, Sendable {

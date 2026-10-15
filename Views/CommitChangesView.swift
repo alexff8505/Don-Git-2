@@ -2,7 +2,8 @@ import SwiftUI
 
 struct CommitChangesView: View {
     let repository: GitRepository
-    let commit: GitCommit
+    let commit: GitCommit?
+    var localChangesRevision = 0
     @StateObject private var details = CommitChangesStore()
     @State private var parentIndex = 0
     @State private var showsMessage = false
@@ -10,9 +11,16 @@ struct CommitChangesView: View {
     @AppStorage("commitDiffPresentation") private var presentation: DiffPresentation = .unified
     @AppStorage("commitDiffWordWrap") private var wordWrap = false
 
-    private var parent: String? { commit.parents.indices.contains(parentIndex) ? commit.parents[parentIndex] : nil }
-    private var comparisonID: String { repository.id + ":" + commit.hash + ":" + (parent ?? "root") }
-    private var fileID: String { comparisonID + ":" + (details.changes?.baseRevision ?? "") + ":" + (details.selectedFileID ?? "") }
+    private var parent: String? {
+        guard let commit, commit.parents.indices.contains(parentIndex) else { return nil }
+        return commit.parents[parentIndex]
+    }
+    private var comparisonID: String { repository.id + ":" + (commit?.hash ?? "working-tree") + ":" + (parent ?? "root") }
+    private var fileID: String { comparisonID + ":" + (details.changes?.baseRevision ?? "") + ":" + (details.selectedFileID ?? "") + ":" + String(details.revision) }
+    private var emptyDescription: String {
+        guard let commit else { return "The working tree is clean." }
+        return commit.parents.count > 1 ? "This merge has no file changes compared with the selected parent." : "This commit has no file changes."
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -33,7 +41,7 @@ struct CommitChangesView: View {
                 }
             } else if details.changes?.files.isEmpty == true {
                 ContentUnavailableView("No File Changes", systemImage: "doc", description:
-                    Text(commit.parents.count > 1 ? "This merge has no file changes compared with the selected parent." : "This commit has no file changes."))
+                    Text(emptyDescription))
             } else {
                 NativeSplitView(isVertical: true, initialFirstSize: 270, minimumFirstSize: 180, minimumSecondSize: 300, maximumFirstSize: 460, persistenceKey: "changedFilesPaneWidth") {
                     fileList
@@ -45,7 +53,7 @@ struct CommitChangesView: View {
             }
         }
         .background(.background)
-        .task(id: comparisonID) { await details.load(repository: repository, commit: commit, parent: parent) }
+        .task(id: comparisonID + (commit == nil ? ":\(localChangesRevision)" : "")) { await details.load(repository: repository, commit: commit, parent: parent) }
         .task(id: fileID) { await details.loadDiff(repository: repository, commit: commit) }
         .onReceive(NotificationCenter.default.publisher(for: .navigateChangedFile)) { notification in
             if let direction = notification.object as? Int { details.moveFile(direction) }
@@ -59,22 +67,27 @@ struct CommitChangesView: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(commit.subject.isEmpty ? "Untitled commit" : commit.subject)
+                    Text(commit.map { $0.subject.isEmpty ? "Untitled commit" : $0.subject } ?? "Uncommitted Changes")
                         .font(.headline)
                         .lineLimit(1)
                         .textSelection(.enabled)
-                        .help(commit.subject)
-                    HStack(spacing: 6) {
-                        Text(commit.shortHash).monospaced()
-                            .help(commit.hash)
-                        Text("·")
-                        Text(commit.authorName).lineLimit(1)
-                        Text("·")
-                        Text(DisplayFormatters.commitDate(commit.authoredAt)).lineLimit(1)
+                        .help(commit?.subject ?? "Review all uncommitted changes")
+                    if let commit {
+                        HStack(spacing: 6) {
+                            Text(commit.shortHash).monospaced().help(commit.hash)
+                            Text("·")
+                            Text(commit.authorName).lineLimit(1)
+                            Text("·")
+                            Text(DisplayFormatters.commitDate(commit.authoredAt)).lineLimit(1)
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                    } else {
+                        Text("Compared with \(details.changes?.baseLabel ?? "HEAD") · Updates as you edit")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
                 }
                 Spacer(minLength: 0)
                 Picker("Diff View", selection: $presentation) {
@@ -93,34 +106,39 @@ struct CommitChangesView: View {
                     Text("−\(changes.deletions)").foregroundStyle(.red)
                 }
                 Spacer(minLength: 0)
-                if commit.parents.count > 1 {
-                    Picker("Compare with", selection: $parentIndex) {
-                        ForEach(commit.parents.indices, id: \.self) { index in
-                            Text("Parent \(index + 1) (\(commit.parents[index].prefix(7)))").tag(index)
+                if let commit {
+                    if commit.parents.count > 1 {
+                        Picker("Compare with", selection: $parentIndex) {
+                            ForEach(commit.parents.indices, id: \.self) { index in
+                                Text("Parent \(index + 1) (\(commit.parents[index].prefix(7)))").tag(index)
+                            }
                         }
+                        .fixedSize()
+                        .help("Choose the parent to compare this merge against")
+                    } else {
+                        Text(parent == nil ? "Empty tree → \(commit.shortHash)" : "Parent → \(commit.shortHash)")
+                            .foregroundStyle(.secondary)
                     }
-                    .fixedSize()
-                    .help("Choose the parent to compare this merge against")
+                    Button {
+                        showsMessage.toggle()
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Show full commit message")
+                    .accessibilityLabel("Show full commit message")
+                    .popover(isPresented: $showsMessage) {
+                        ScrollView {
+                            Text(details.changes?.message ?? commit.subject)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding()
+                        }
+                        .frame(width: 420, height: 240)
+                    }
                 } else {
-                    Text(parent == nil ? "Empty tree → \(commit.shortHash)" : "Parent → \(commit.shortHash)")
+                    Text("\(details.changes?.baseLabel ?? "HEAD") → Working Copy")
                         .foregroundStyle(.secondary)
-                }
-                Button {
-                    showsMessage.toggle()
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-                .buttonStyle(.borderless)
-                .help("Show full commit message")
-                .accessibilityLabel("Show full commit message")
-                .popover(isPresented: $showsMessage) {
-                    ScrollView {
-                        Text(details.changes?.message ?? commit.subject)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding()
-                    }
-                    .frame(width: 420, height: 240)
                 }
             }
             .font(.caption)
@@ -207,7 +225,9 @@ struct CommitChangesView: View {
                 } else if diff.lines.isEmpty {
                     ContentUnavailableView("No Text Changes", systemImage: "doc", description: Text("Only the file name or metadata changed."))
                 } else {
-                    DiffCodeView(diff: diff, presentation: presentation, selectedChangeID: details.selectedChangeID, wordWrap: wordWrap)
+                    DiffCodeView(diff: diff, presentation: presentation, selectedChangeID: details.selectedChangeID, wordWrap: wordWrap,
+                                 beforeTitle: commit == nil ? (details.changes?.baseLabel ?? "HEAD") : "Before",
+                                 afterTitle: commit == nil ? "Working Copy" : "After")
                 }
             } else {
                 ContentUnavailableView("Select a File", systemImage: "doc.text.magnifyingglass", description: Text("Choose a changed file to view its diff."))
