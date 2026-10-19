@@ -1,4 +1,48 @@
-# Uncommitted changes — option 1
+# Inline worktree labels — option 1
+
+Date: 19 October 2026
+
+final result: passed
+
+## Follow-up: HEAD connection and branch pairs
+
+- User-approved follow-up on 19 October 2026: restore the dotted connection to actual HEAD even below other branch tips, and group local/remote pills into logical pairs.
+- Implemented an independent dotted lane past intervening commits, with a curved join to HEAD and no extension below it. Direct HEAD, detached HEAD and missing/unborn HEAD have explicit handling. Both graph cell types use the same vertical bleed to bridge native row spacing.
+- Presentation groups the current local branch first, then other locals with their exact matching remote refs (origin first). Checkout labels remain with their local pill. Tags, symbolic remote HEAD and unpaired refs remain separate. Git's original ref metadata and graph routing remain intact.
+- Native WTC screenshot: `/tmp/dongit-head-connection-and-ref-pairs.png`, 3228 × 1998 pixels at 2× density. The dotted line visibly bypasses the Tesla commit and joins dev's HEAD, with dev/origin-dev and main/origin-main pairs. Verified with both a saved commit and Uncommitted Changes selected in the existing System/light appearance; app left open on WTC.
+- Build, all 11 graph checks, parent topology across WTC's 1,932 commits, worktree lifecycle regression checks and whitespace checks pass. New tests cover direct/lower/detached/missing HEAD, multiple bypassed commits, clean history, exact remote matching, slashed branch names, custom remotes, checkout metadata preservation and unpaired refs. No actionable visual issues remain.
+
+## Visual evidence
+
+- Selected visual: `/Users/alexfraser/.codex/generated_images/01a15390-63ca-7a73-875a-6abbf6810f0d/exec-4282bbe0-2ecd-4579-9fa4-60d19f849f29.png`, the first displayed mockup (inline folder icon and Worktree label).
+- Running implementation: `dist/Don Git 2.app`. Screenshot: `/tmp/dongit-inline-worktree-dark.png`. Source and implementation were emitted together in one CUA comparison input.
+- Source is 1613 × 975 pixels at approximately 1× density; implementation is 3228 × 1998 pixels, a 1614 × 999 point native window at 2×. Comparison uses corresponding logical sizes without stretching. The existing saved column widths, splitter positions, 24-point height difference, native material tint and current system font remain intentional platform adaptations.
+- Matched feature state: dark appearance, linked Tesla branch selected, inline Worktree label, separate Main checkout label, unified diff below. A disposable WTC Preview repository supplies real Git checkout records. Actual WTC no longer has the Tesla worktree, so its correct live state shows only dev's Main checkout label. WTC's checkouts were not changed for the preview.
+- Light appearance was also inspected. Original System appearance and Side by Side presentation were restored. Temporary preview was removed from the sidebar; app left open on WTC with its prior commit selection retained.
+
+## Findings and fidelity
+
+- No actionable P0/P1/P2 differences. The folder symbol and Worktree text are inside the local branch capsule; Main checkout is an adjacent subdued capsule. Remote refs and other local branches remain unmarked, including when they point at the same commit.
+- Fonts/typography: existing system caption size and semibold badge weight retained; both labels are legible and aligned with existing refs. Native accessibility labels include branch, checkout type and full path.
+- Spacing/layout: existing table columns and row heights remain unchanged. The new icon/text uses compact spacing within the capsule. Existing native truncation and user-resized column behavior are retained. Full-resolution feature rows were readable in the combined comparison; no separate crop was necessary.
+- Colors/tokens: existing green local and red remote tints, semantic secondary text, native blue selection and adaptive system materials retained in light and dark appearances.
+- Assets: native SF Symbols folder icon; no rasterized UI, custom image assets or new icon system.
+- Copy/content: Worktree and Main checkout match the selected concept. Native help contains the checkout path. Automated tooltip-hover capture was not performed; help and accessibility descriptions are defined on each badge.
+- Comparison history: first combined comparison passed; no visual corrections were needed. Test-fixture path expectations were corrected for macOS's /var and /private/var aliases before the integration checks passed.
+
+## Verification
+
+- Packaged app build passes.
+- Worktree integration checks pass: NUL-safe paths with spaces/newlines/quotes, locked checkouts, detached/bare/prunable entries, exact local-branch matching, tag collisions and custom remotes, linked-repository perspective, addition, branch switch, move, removal, stale folders, selection preservation, and main checkout branch switches without a commit change.
+- Live read-only check of WTC reports dev as Main checkout.
+- Existing nine graph checks, repository-selection checks and origin-refresh checks pass.
+- Native UI verification covers linked branch selection, commit details, both diff modes, light/dark readability and restored preferences. Browser console checks do not apply to this SwiftUI/AppKit app.
+
+No follow-up polish is required for this feature.
+
+---
+
+# Previous verification: uncommitted changes — option 1
 
 Date: 15 October 2026
 

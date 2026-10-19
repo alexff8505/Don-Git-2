@@ -12,6 +12,8 @@ struct CommitGraphTests {
         tests.testNativePaletteContrast()
         tests.testHistoryMismatchIsRejected()
         tests.testDecorationOrderMatchesGit()
+        try tests.testWorkingTreeConnectionBypassesNewerCommits()
+        tests.testRefGroupsPairLocalAndRemoteBranches()
         try await tests.testRealGitOctopusHistory()
         try await tests.testRealGitInterleavedMergesAndRoots()
         for path in CommandLine.arguments.dropFirst() {
@@ -19,12 +21,62 @@ struct CommitGraphTests {
             tests.assertRenderedParents(in: rows)
             print("Verified rendered parent connections for \(rows.count) commits in \(path).")
         }
-        print("Passed 9 graph checks, including parent topology, lane colour continuity, and native palette contrast.")
+        print("Passed 11 graph checks, including working-tree connections, ref pairs, parent topology, lane colour continuity, and native palette contrast.")
     }
 
     private func commit(_ hash: String, parents: [String]) -> GitCommit {
         GitCommit(hash: hash, parents: parents, authorName: "Test", authorEmail: "",
                   authoredAt: .distantPast, subject: hash, refs: [])
+    }
+
+    func testWorkingTreeConnectionBypassesNewerCommits() throws {
+        let newer = commit("newer", parents: ["middle"])
+        let middle = commit("middle", parents: ["head"])
+        let head = GitCommit(hash: "head", parents: ["root"], authorName: "Test", authorEmail: "",
+                             authoredAt: .distantPast, subject: "HEAD", refs: GitRefParser.badges(from: "HEAD -> dev"))
+        let root = commit("root", parents: [])
+        let rows = try CommitGraphBuilder().rows(for: [newer, middle, head, root],
+            graphOutput: "* \u{1f}newer\n* \u{1f}middle\n* \u{1f}head\n* \u{1f}root\n")
+        let layout = WorkingTreeGraphLayout(rows: rows, hasLocalChanges: true)
+        precondition(layout.graphInset == 16, "Reserve a lane so the dotted stem does not pass through unrelated nodes")
+        precondition(layout.connections == ["newer": .continuation, "middle": .continuation, "head": .head],
+                     "Continue through every intervening row, terminate at actual HEAD, and stop before its parents")
+        let direct = WorkingTreeGraphLayout(rows: Array(rows.dropFirst(2)), hasLocalChanges: true)
+        precondition(direct.graphInset == 0 && direct.connections == ["head": .head])
+        let clean = WorkingTreeGraphLayout(rows: rows, hasLocalChanges: false)
+        precondition(clean.connections.isEmpty && clean.graphInset == 0)
+        let noHead = WorkingTreeGraphLayout(rows: [rows[0]], hasLocalChanges: true)
+        precondition(noHead.connections.isEmpty && noHead.graphInset == 0,
+                     "Unborn repositories or history without HEAD must not connect to another branch")
+        let empty = WorkingTreeGraphLayout(rows: [], hasLocalChanges: true)
+        precondition(empty.connections.isEmpty && empty.graphInset == 0)
+        let detached = GitCommit(hash: "detached", parents: [], authorName: "Test", authorEmail: "",
+                                authoredAt: .distantPast, subject: "Detached", refs: GitRefParser.badges(from: "HEAD"))
+        let detachedRows = try CommitGraphBuilder().rows(for: [detached], graphOutput: "* \u{1f}detached\n")
+        precondition(WorkingTreeGraphLayout(rows: detachedRows, hasLocalChanges: true).connections == ["detached": .head])
+    }
+
+    func testRefGroupsPairLocalAndRemoteBranches() {
+        var badges = GitRefParser.badges(from:
+            "HEAD -> dev, origin/main, origin/dev, origin/HEAD, tag: v1, main, origin/codex/topic, codex/topic, origin/only-remote")
+        let checkout = GitBranchCheckout(path: "/tmp/topic", isMain: false)
+        badges[badges.firstIndex { $0.name == "codex/topic" }!].checkout = checkout
+        badges.append(GitRefBadge(name: "upstream/codex/topic", kind: .remote))
+        let groups = GitRefParser.groups(for: badges)
+        precondition(groups.map { $0.badges.map(\.name) } == [
+            ["dev", "origin/dev"], ["codex/topic", "origin/codex/topic", "upstream/codex/topic"],
+            ["main", "origin/main"], ["origin/HEAD"], ["v1"], ["origin/only-remote"]
+        ], "Keep HEAD first, pair exact branch names (including slashes), and leave tags/symbolic refs separate")
+        precondition(groups[1].badges[0].checkout == checkout, "Checkout metadata stays with the local pill")
+        let visibleIDs = groups.flatMap(\.badges).map(\.id)
+        precondition(Set(visibleIDs).count == badges.count - 1 && visibleIDs.count == badges.count - 1,
+                     "Only the redundant HEAD pill is hidden; each other badge appears once")
+        let unpaired = GitRefParser.groups(for: [GitRefBadge(name: "dev", kind: .branch),
+                                                GitRefBadge(name: "origin/main", kind: .remote)])
+        precondition(unpaired.map { $0.badges.map(\.name) } == [["dev"], ["origin/main"]],
+                     "A remote on another commit must not be invented or paired with a different branch")
+        precondition(GitRefParser.groups(for: GitRefParser.badges(from: "HEAD, origin/main")).first?.badges.first?.kind == .head)
+        precondition(GitRefParser.groups(for: []).isEmpty)
     }
 
     func testMergePreservesGitRoutingAndColors() throws {

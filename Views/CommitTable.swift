@@ -7,20 +7,23 @@ struct CommitTable: View {
     @FocusState private var hasKeyboardFocus: Bool
 
     var body: some View {
-        Table(entries, selection: $selectedCommitID) {
+        let workingTreeLayout = WorkingTreeGraphLayout(rows: rows, hasLocalChanges: localChangesCount > 0)
+        return Table(entries, selection: $selectedCommitID) {
             TableColumn("Graph") { row in
-                if let commit = row.commitRow {
-                    CommitGraphView(graph: commit.graph, isSelected: row.id == selectedCommitID,
-                                    hasWorkingTreeAbove: connectsWorkingTree && rows.first?.id == row.id)
-                        .frame(height: rowHeight(for: row) + CommitTableMetrics.graphVerticalBleed * 2)
-                        .offset(y: -CommitTableMetrics.graphVerticalBleed)
-                        .frame(height: rowHeight(for: row), alignment: .top)
-                } else {
-                    WorkingTreeGraphView(connectsToHEAD: connectsWorkingTree)
-                        .frame(height: CommitTableMetrics.rowHeight)
+                Group {
+                    if let commit = row.commitRow {
+                        CommitGraphView(graph: commit.graph, isSelected: row.id == selectedCommitID,
+                                        workingTreeConnection: workingTreeLayout.connections[row.id],
+                                        graphInset: workingTreeLayout.graphInset)
+                    } else {
+                        WorkingTreeGraphView(connectsToHEAD: !workingTreeLayout.connections.isEmpty)
+                    }
                 }
+                .frame(height: rowHeight(for: row) + CommitTableMetrics.graphVerticalBleed * 2)
+                .offset(y: -CommitTableMetrics.graphVerticalBleed)
+                .frame(height: rowHeight(for: row), alignment: .top)
             }
-            .width(min: 42, ideal: 96, max: max(2_000, graphWidth))
+            .width(min: 42, ideal: 96, max: max(2_000, graphWidth + workingTreeLayout.graphInset))
 
             TableColumn("Commit") { row in
                 if let commit = row.commitRow {
@@ -83,10 +86,6 @@ struct CommitTable: View {
         (localChangesCount > 0 ? [.workingTree(localChangesCount)] : []) + rows.map(HistoryEntry.commit)
     }
 
-    private var connectsWorkingTree: Bool {
-        localChangesCount > 0 && rows.first?.commit.refs.contains { $0.kind == .head } == true
-    }
-
     private func rowHeight(for row: HistoryEntry) -> CGFloat {
         max(CommitTableMetrics.rowHeight, CGFloat(row.commitRow?.graph.lines.count ?? 1) * 18)
     }
@@ -106,7 +105,7 @@ private struct WorkingTreeGraphView: View {
             if connectsToHEAD {
                 var stem = Path()
                 stem.move(to: CGPoint(x: center.x, y: center.y + 5))
-                stem.addLine(to: CGPoint(x: center.x, y: size.height + 7))
+                stem.addLine(to: CGPoint(x: center.x, y: size.height))
                 context.stroke(stem, with: .foreground, style: StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
             }
             context.stroke(Path(ellipseIn: CGRect(x: center.x - 5, y: center.y - 5, width: 10, height: 10)),
@@ -130,9 +129,13 @@ private struct CommitSummaryCell: View {
                 Text(row.commit.subject.isEmpty ? "Untitled commit" : row.commit.subject)
                     .lineLimit(1)
                     .foregroundStyle(row.commit.subject.isEmpty ? .secondary : .primary)
-                HStack(spacing: 5) {
-                    ForEach(row.commit.refs.filter { $0.kind != .head || !row.commit.refs.contains(where: { $0.kind == .currentBranch }) }) { badge in
-                        RefBadgeView(badge: badge)
+                HStack(spacing: 10) {
+                    ForEach(GitRefParser.groups(for: row.commit.refs)) { group in
+                        HStack(spacing: 5) {
+                            ForEach(group.badges) { badge in
+                                RefBadgeView(badge: badge)
+                            }
+                        }
                     }
                 }
             }
@@ -147,6 +150,24 @@ private struct RefBadgeView: View {
     let badge: GitRefBadge
 
     var body: some View {
+        HStack(spacing: 5) {
+            capsule
+            if badge.checkout?.isMain == true {
+                Text("Main checkout")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.quaternary, in: Capsule())
+            }
+        }
+        .fixedSize(horizontal: true, vertical: false)
+        .help(badge.checkout.map { "\(badge.name)\n\($0.help)" } ?? badge.name)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityDescription)
+    }
+
+    private var capsule: some View {
         HStack(spacing: 0) {
             if badge.kind == .currentBranch {
                 Text("HEAD")
@@ -154,6 +175,10 @@ private struct RefBadgeView: View {
             }
             Text(badge.kind == .tag ? "tag: \(badge.name)" : badge.name)
                 .lineLimit(1)
+            if badge.checkout?.isMain == false {
+                Label("Worktree", systemImage: "folder")
+                    .padding(.leading, 6)
+            }
         }
         .font(.caption2.weight(.semibold))
         .padding(.horizontal, 6)
@@ -165,6 +190,12 @@ private struct RefBadgeView: View {
                 .stroke(tint.opacity(0.42), lineWidth: 0.75)
         }
         .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private var accessibilityDescription: String {
+        let name = badge.kind == .currentBranch ? "HEAD, \(badge.name)" : badge.name
+        guard let checkout = badge.checkout else { return name }
+        return "\(name), \(checkout.label), \(checkout.path)"
     }
 
     private var tint: Color {

@@ -29,9 +29,27 @@ struct GitRefBadge: Identifiable, Hashable, Sendable {
 
     let name: String
     let kind: Kind
+    var checkout: GitBranchCheckout? = nil
 
     var id: String {
         "\(kind)-\(name)"
+    }
+}
+
+struct GitRefBadgeGroup: Identifiable {
+    let badges: [GitRefBadge]
+
+    var id: String { badges[0].id }
+}
+
+struct GitBranchCheckout: Hashable, Sendable {
+    let path: String
+    let isMain: Bool
+
+    var label: String { isMain ? "Main checkout" : "Worktree" }
+
+    var help: String {
+        "\(isMain ? "Main checkout" : "Linked worktree")\n\(path)"
     }
 }
 

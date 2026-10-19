@@ -172,8 +172,11 @@ struct GitClient: Sendable {
                 "refs/remotes",
                 "refs/tags"
             ], in: repository.path)
+            let symbolicHead = (try? runGit(["symbolic-ref", "--quiet", "HEAD"], in: repository.path)) ?? ""
+            let worktrees = try runGit(["worktree", "list", "--porcelain", "-z"], in: repository.path)
 
-            return head + "\n" + refs
+            // Checkouts can move, switch branch or disappear without changing any commit/ref hash.
+            return head + "\n" + symbolicHead + "\n" + refs + "\n" + worktrees
         }.value
     }
 
@@ -217,7 +220,7 @@ struct GitClient: Sendable {
             "log",
             "--graph",
             "--all",
-            "--decorate=short",
+            "--decorate=full",
             "--color=always",
             "--date=iso-strict",
             "--format=%x1f%H%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D"
@@ -230,7 +233,9 @@ struct GitClient: Sendable {
             guard let marker = line.firstIndex(of: "\u{1f}") else { return nil }
             return String(line[line.index(after: marker)...])
         }.joined(separator: "\u{1e}")
-        let commits = try parseCommits(metadata)
+        let checkouts = GitWorktreeParser.checkouts(from:
+            try runGit(["worktree", "list", "--porcelain", "-z"], in: repository.path))
+        let commits = try parseCommits(metadata, checkouts: checkouts)
         return try CommitGraphBuilder().rows(for: commits, graphOutput: graphOutput)
     }
 
@@ -321,7 +326,7 @@ struct GitClient: Sendable {
         return environment
     }
 
-    private func parseCommits(_ output: String) throws -> [GitCommit] {
+    private func parseCommits(_ output: String, checkouts: [String: GitBranchCheckout]) throws -> [GitCommit] {
         let recordSeparator = Character("\u{1e}")
         let fieldSeparator = Character("\u{1f}")
         let records = output
@@ -342,7 +347,13 @@ struct GitClient: Sendable {
                 authorEmail: String(fields[3]),
                 authoredAt: DateParsers.gitDate(String(fields[4])) ?? .distantPast,
                 subject: String(fields[5]),
-                refs: GitRefParser.badges(from: String(fields[6]))
+                refs: GitRefParser.badges(from: String(fields[6])).map { badge in
+                    var badge = badge
+                    if badge.kind == .branch || badge.kind == .currentBranch {
+                        badge.checkout = checkouts[badge.name]
+                    }
+                    return badge
+                }
             )
         }
     }

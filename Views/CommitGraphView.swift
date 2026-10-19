@@ -3,7 +3,8 @@ import SwiftUI
 struct CommitGraphView: View {
     let graph: CommitGraphState
     var isSelected = false
-    var hasWorkingTreeAbove = false
+    var workingTreeConnection: WorkingTreeGraphConnection?
+    var graphInset: CGFloat = 0
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -26,7 +27,7 @@ struct CommitGraphView: View {
                 let y = value.line <= 0.5
                     ? inset + CGFloat(value.line) * 2 * (center - inset)
                     : center + (CGFloat(value.line) - 0.5) * unit
-                return CGPoint(x: CGFloat(value.column) * 8 + 10, y: y)
+                return CGPoint(x: CGFloat(value.column) * 8 + 10 + graphInset, y: y)
             }
             let stroke = StrokeStyle(lineWidth: increasedContrast ? 2.4 : 1.8,
                                      lineCap: .round, lineJoin: .round)
@@ -78,16 +79,25 @@ struct CommitGraphView: View {
                     context.stroke(interior, with: .color(color(for: item.color)), style: stroke)
                 }
             }
+            if workingTreeConnection == .continuation {
+                var stem = Path()
+                stem.move(to: CGPoint(x: 10, y: 0))
+                stem.addLine(to: CGPoint(x: 10, y: size.height))
+                context.stroke(stem, with: .color(.secondary),
+                               style: StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
+            }
             if let column = graph.lines[graph.nodeLine].firstIndex(where: { $0.character == "*" }) {
                 let position = point(GitGraphPoint(column: Double(column), line: Double(graph.nodeLine) + 0.5))
                 let radius: CGFloat = graph.parentCount > 1 ? 4 : 3.3
                 let node = Path(ellipseIn: CGRect(x: position.x - radius, y: position.y - radius,
                                                 width: radius * 2, height: radius * 2))
                 let nodeColor = color(for: graph.nodeColor)
-                if hasWorkingTreeAbove {
+                if workingTreeConnection == .head {
                     var workingTreeStem = Path()
-                    workingTreeStem.move(to: CGPoint(x: position.x, y: 0))
-                    workingTreeStem.addLine(to: position)
+                    workingTreeStem.move(to: CGPoint(x: 10, y: 0))
+                    workingTreeStem.addCurve(to: position,
+                        control1: CGPoint(x: 10, y: position.y * 0.6),
+                        control2: CGPoint(x: position.x, y: position.y * 0.4))
                     context.stroke(workingTreeStem, with: .color(.secondary),
                                    style: StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
                 }
@@ -99,7 +109,7 @@ struct CommitGraphView: View {
                 context.fill(node, with: .color(graph.parentCount > 1 ? Color(nsColor: .controlBackgroundColor) : nodeColor))
                 context.stroke(node, with: .color(nodeColor), lineWidth: graph.parentCount > 1 ? 2 : 1)
             }
-            if CGFloat(graph.laneCount) * 16 + 4 > size.width {
+            if CGFloat(graph.laneCount) * 16 + graphInset + 4 > size.width {
                 let marker = CGRect(x: size.width - 16, y: center - 8, width: 16, height: 16)
                 context.fill(Path(roundedRect: marker, cornerRadius: 3), with: .color(Color(nsColor: .controlBackgroundColor)))
                 context.draw(Text("…").font(.caption).foregroundStyle(.secondary), at: CGPoint(x: marker.midX, y: marker.midY))

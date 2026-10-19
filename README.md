@@ -30,7 +30,7 @@ Compare merge commits against either parent, and root commits against an empty t
 
 ## Stay in the flow
 
-Select **Uncommitted Changes** at the top of the history to review staged edits, unstaged edits, and new files before committing. The hollow graph node and **Not committed** label distinguish the working tree from saved commits. Its file list and unified or side-by-side diff compare the current working copy with HEAD, including additions, deletions, renames, and binary files.
+Select **Uncommitted Changes** at the top of the history to review staged edits, unstaged edits, and new files before committing. The hollow graph node and **Not committed** label distinguish the working tree from saved commits. A dotted line connects it to HEAD, bypassing newer commits on other branches. Its file list and unified or side-by-side diff compare the current working copy with HEAD, including additions, deletions, renames, and binary files.
 
 Local changes refresh every three seconds while preserving the selected file. Origin checks run separately so a slow connection does not hold up local previews. Reviewing changes leaves your index and files unchanged. Repositories without a first commit compare against an empty tree; committing removes the uncommitted row and selects the new commit.
 
@@ -55,6 +55,8 @@ Switch repositories and return to the commit you were reviewing. Resized history
 - Add repositories through the standard macOS folder picker; any folder inside a Git working tree is accepted.
 - Give repository folders persistent colours and sort by name or most recent commit date.
 - Follow the routing and order of `git log --graph --oneline --decorate --all`, with branch, remote, and tag badges.
+- Read local branch badges beside their matching origin badges, with the current branch first. Tags and unmatched remote refs stay separate.
+- Spot linked checkouts by the folder icon and **Worktree** label inside local branch badges. **Main checkout** identifies the branch in the main repository folder. Hover for the checkout path; labels refresh as worktrees change.
 - Read continuous coloured lanes, curved joins, and outlined merge nodes in both light and dark appearances. Crossings stay separate from parent junctions.
 - Read the current branch, commit count, and working-tree status in the bottom bar.
 - Automatically fetch origin when opening a repository, returning to the app, and every minute. The graph shows the latest fetched origin branch positions, including new branches, force-pushes, and deletions.
@@ -92,6 +94,7 @@ bash script/test_columns.sh
 bash script/test_repository_selection.sh
 bash script/test_origin_refresh.sh
 bash script/test_local_changes.sh
+bash script/test_worktrees.sh
 ```
 
 To check every rendered parent connection in an existing repository, pass its path to `script/test_graph.sh`. This reads the repository without modifying it. Graph checks also compare ordering with the reference Git command, exercise real merges with up to four parents and interleaved roots, and measure native palette contrast.

@@ -1,3 +1,29 @@
+/// A separate lane bypasses newer commits so uncommitted changes join only HEAD.
+struct WorkingTreeGraphLayout {
+    let connections: [String: WorkingTreeGraphConnection]
+    let graphInset: Double
+
+    init(rows: [CommitRow], hasLocalChanges: Bool) {
+        guard hasLocalChanges,
+              let headIndex = rows.firstIndex(where: { $0.commit.refs.contains { $0.kind == .head || $0.kind == .currentBranch } }) else {
+            connections = [:]
+            graphInset = 0
+            return
+        }
+        graphInset = headIndex == 0 ? 0 : 16
+        var connections: [String: WorkingTreeGraphConnection] = [:]
+        for index in 0...headIndex {
+            connections[rows[index].id] = index == headIndex ? .head : .continuation
+        }
+        self.connections = connections
+    }
+}
+
+enum WorkingTreeGraphConnection: Hashable {
+    case continuation
+    case head
+}
+
 /// Column coordinates shared by neighbouring ASCII graph lines, including
 /// diagonals that Git advances by one character during a lane collapse.
 enum CommitGraphGeometry {
