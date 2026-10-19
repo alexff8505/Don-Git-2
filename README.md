@@ -56,6 +56,7 @@ Switch repositories and return to the commit you were reviewing. Resized history
 - Give repository folders persistent colours and sort by name or most recent commit date.
 - Follow the routing and order of `git log --graph --oneline --decorate --all`, with branch, remote, and tag badges.
 - Read local branch badges beside their matching origin badges, with the current branch first. Tags and unmatched remote refs stay separate.
+- Distinguish local and remote branches with subtle system green and red tints that adapt to light, dark, and increased-contrast appearances.
 - Spot linked worktrees by the folder icon inside local branch badges; a house icon identifies the main checkout. Hover for the checkout type and folder path; markers refresh as worktrees change.
 - Read continuous coloured lanes, curved joins, and outlined merge nodes in both light and dark appearances. Crossings stay separate from parent junctions.
 - Read the current branch, commit count, and working-tree status in the bottom bar.

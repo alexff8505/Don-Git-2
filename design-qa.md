@@ -4,7 +4,22 @@ Date: 19 October 2026
 
 final result: passed
 
-## Latest refinement: matching checkout icons
+## Latest refinement: adaptive native branch pills
+
+- Supersedes the solid-fill colour option below at the user's request. Removed custom RGB fills and forced white text. Branch badges use macOS systemGreen/systemRed with semantic primary text, medium-weight system caption text, and a subtle thin outline.
+- Light appearance uses 12% tint and 25% outline opacity; dark appearance uses 22% tint and 35% outline opacity. Increased Contrast strengthens the outline to 60%. House/folder icons, pill dimensions, branch pairs, tooltips and graph rendering are unchanged.
+- Native WTC captures: `/tmp/dongit-native-pills-light.png` and `/tmp/dongit-native-pills-dark.png`, both 3228 × 1998 pixels at 2× (1614 × 999 points). Both appearances were inspected in the running app: readable dark/light foregrounds, muted colour separation and aligned inline icons. Existing selected/inactive row treatments remain native. Original Light preference restored and app left on WTC.
+- Packaged build and whitespace checks pass. No new logic tests were added for this presentation-only refinement. No actionable layout or readability issues were observed.
+
+## Previous refinement: brighter branch pills, colour option 1
+
+- Selected colour reference: `/Users/alexfraser/.codex/generated_images/01a15390-63ca-7a73-875a-6abbf6810f0d/exec-19286b04-92d8-4c07-af27-101db84234df.png` (first displayed colour mockup).
+- Applied rich green local fills, rich red remote fills, white text/icons and stronger thin outlines. Other badge types retain their existing treatment. Pairing, icon placement, graph colours, diff colours and row selection behavior are unchanged.
+- Implementation screenshot: `/tmp/dongit-rich-branch-pills.png`, 3228 × 1998 pixels at 2×, corresponding to 1614 × 999 points. Source is 1594 × 987 pixels at approximately 1×. Source and implementation were opened together in one comparison input, comparing their corresponding logical dimensions. WTC, dark appearance, c246920 selected and Side by Side diff match the selected mockup state. Existing window chrome/material and native rendering remain intentional differences.
+- Font, capsule size, spacing, copy, paired ordering and system house icon match the existing native design. Full-view feature text is legible; no separate crop was needed. Green is slightly darker than the generated sample to keep white small-label contrast at 4.57:1; red contrast is 5.78:1. Fixed fill colours keep those contrasts in either appearance. No new image assets or UI controls were introduced.
+- Packaged build and whitespace checks pass. Native selection and commit details were checked after restarting. First matched-state comparison passed, with no P0/P1/P2 findings or visual repair iterations. App left open on WTC. Colour changes remain uncommitted.
+
+## Previous refinement: matching checkout icons
 
 - Both checkout types now use the same compact icon placement inside the local branch capsule: house for the main checkout, folder for linked worktrees. Removed the Worktree text while retaining the native tooltip and accessible checkout type/path. Both icons use the same system font, padding and semantic color. No data, pairing or graph behavior changed.
 

@@ -148,6 +148,8 @@ private struct CommitSummaryCell: View {
 
 private struct RefBadgeView: View {
     let badge: GitRefBadge
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         capsule
@@ -170,14 +172,15 @@ private struct RefBadgeView: View {
                     .accessibilityHidden(true)
             }
         }
-        .font(.caption2.weight(.semibold))
+        .font(.caption2.weight(.medium))
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
         .foregroundStyle(.primary)
-        .background(tint.opacity(0.18), in: Capsule())
+        .background(tint.opacity(colorScheme == .dark ? 0.22 : 0.12), in: Capsule())
         .overlay {
             Capsule()
-                .stroke(tint.opacity(0.42), lineWidth: 0.75)
+                .stroke(tint.opacity(contrast == .increased ? 0.6 : colorScheme == .dark ? 0.35 : 0.25),
+                        lineWidth: 0.75)
         }
         .fixedSize(horizontal: true, vertical: false)
     }
@@ -193,9 +196,9 @@ private struct RefBadgeView: View {
         case .head:
             .cyan
         case .currentBranch, .branch:
-            .green
+            Color(nsColor: .systemGreen)
         case .remote:
-            .red
+            Color(nsColor: .systemRed)
         case .tag:
             .yellow
         }

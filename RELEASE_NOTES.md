@@ -1,5 +1,26 @@
 # Changelog
 
+## 19 October 2026 — Checkout markers and clearer branch history
+
+### Identify checkouts
+
+- Show a house icon inside the local branch pill for the main checkout and a folder icon for linked worktrees.
+- Show the checkout type and full folder path on hover and through accessibility descriptions.
+- Refresh checkout markers when worktrees are added, moved, removed or switched to another branch, including switches at the same commit.
+- Keep detached, bare and stale worktree records from producing misleading branch markers.
+
+### Read branch relationships
+
+- Group each local branch with its matching origin pill, with the current branch first. Tags, symbolic remote HEAD and unmatched refs remain separate.
+- Connect Uncommitted Changes to its actual HEAD with a dotted line, using a separate lane past newer commits on other branches.
+- Use macOS system green and red, subtle appearance-aware tints, semantic text colours and lighter outlines. Pills adapt to light, dark and increased-contrast appearances.
+
+### Validation
+
+- Added real-Git worktree lifecycle checks, including unusual paths, custom remotes, colliding tag names, linked-repository views and cached refreshes.
+- Expanded graph checks to cover dotted HEAD connections and branch pairing; verified parent connections across WTC's 1,932 commits.
+- Built the packaged app and checked the final native styling in both light and dark appearances.
+
 ## 15 October 2026 — Origin refresh and uncommitted changes
 
 ### Review uncommitted changes
