@@ -59,6 +59,7 @@ Switch repositories and return to the commit you were reviewing. Resized history
 - Distinguish local and remote branches with subtle system green and red tints that adapt to light, dark, and increased-contrast appearances.
 - Spot linked worktrees by the folder icon inside local branch badges; a house icon identifies the main checkout. Hover for the checkout type and folder path; markers refresh as worktrees change.
 - Read continuous coloured lanes, curved joins, and outlined merge nodes in both light and dark appearances. Crossings stay separate from parent junctions.
+- Graph lines share a drawing layer above the native rows, spanning their measured spacing without breaks when scrolling, selecting commits or resizing columns.
 - Read the current branch, commit count, and working-tree status in the bottom bar.
 - Automatically fetch origin when opening a repository, returning to the app, and every minute. The graph shows the latest fetched origin branch positions, including new branches, force-pushes, and deletions.
 - Check origin immediately with **Refresh History** (⌘R). The bottom bar shows the last successful check, progress, or a connection/authentication failure; existing history stays available offline.
@@ -68,6 +69,8 @@ Switch repositories and return to the commit you were reviewing. Resized history
 Choose **System**, **Light**, or **Dark** in **Don Git 2 → Settings…** (⌘,). The choice applies immediately throughout the app and is remembered across launches. System follows your Mac’s appearance.
 
 Drag the **Graph** column divider to widen it for dense histories. An ellipsis marks rows with lanes outside the current column width.
+
+Read connections downward from each commit to its parents. Git groups branch history and keeps children above their parents; commit dates can therefore appear out of sequence between branches.
 
 The interface follows native macOS conventions, including the macOS 26 / Golden Gate toolbar treatment, while retaining macOS 15 support.
 
@@ -89,6 +92,7 @@ The focused checks cover origin refresh, uncommitted changes and index preservat
 
 ```bash
 bash script/test_graph.sh
+bash script/test_graph_overlay.sh
 bash script/test_changes.sh
 bash script/test_diff_view.sh
 bash script/test_columns.sh

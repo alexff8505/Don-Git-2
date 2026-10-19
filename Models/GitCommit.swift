@@ -92,6 +92,12 @@ struct CommitGraphState: Hashable, Sendable {
 
     var nodeColor: [Int] { incomingColor ?? outgoingColor ?? [34] }
 
+    var accessibilityDescription: String {
+        let kind = parentCount == 0 ? "Root commit" : parentCount > 1 ? "Merge commit, \(parentCount) parents" : "Commit, 1 parent"
+        let column = lines[nodeLine].firstIndex { $0.character == "*" } ?? 0
+        return "\(kind), lane \(column / 2 + 1) of \(laneCount)"
+    }
+
     var laneCount: Int {
         ((lines.map(\.count).max() ?? 1) + 1) / 2
     }

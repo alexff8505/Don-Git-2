@@ -5,6 +5,7 @@ struct CommitGraphView: View {
     var isSelected = false
     var workingTreeConnection: WorkingTreeGraphConnection?
     var graphInset: CGFloat = 0
+    var nodeCenter: CGFloat?
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -20,37 +21,25 @@ struct CommitGraphView: View {
                 colors[codes] = value
                 return value
             }
-            let inset: CGFloat = 7
-            let center = size.height / 2
-            let unit = (size.height - inset - center) / (CGFloat(max(1, graph.lines.count)) - 0.5)
+            let center = nodeCenter ?? size.height / 2
+            let nodeLine = CGFloat(graph.nodeLine) + 0.5
+            let unit = (size.height - center) / (CGFloat(graph.lines.count) - nodeLine)
             func point(_ value: GitGraphPoint) -> CGPoint {
-                let y = value.line <= 0.5
-                    ? inset + CGFloat(value.line) * 2 * (center - inset)
-                    : center + (CGFloat(value.line) - 0.5) * unit
+                let y = CGFloat(value.line) <= nodeLine
+                    ? CGFloat(value.line) / nodeLine * center
+                    : center + (CGFloat(value.line) - nodeLine) * unit
                 return CGPoint(x: CGFloat(value.column) * 8 + 10 + graphInset, y: y)
             }
             let stroke = StrokeStyle(lineWidth: increasedContrast ? 2.4 : 1.8,
                                      lineCap: .round, lineJoin: .round)
             let casing = StrokeStyle(lineWidth: stroke.lineWidth + 2, lineCap: .round, lineJoin: .round)
             let background = Color(nsColor: .controlBackgroundColor)
-            let outgoingPorts = Set(graph.nextLine.indices.compactMap {
-                CommitGraphGeometry.endpoints(column: $0, line: graph.nextLine, previous: graph.lines.last ?? [], next: []).upper
-            })
+            let segments = CommitGraphGeometry.segments(for: graph)
             var paths: [(path: Path, start: CGPoint, end: CGPoint, color: [Int])] = []
-            for segment in CommitGraphGeometry.segments(for: graph) {
+            for segment in segments {
                 let start = point(segment.start), end = point(segment.end)
                 var path = Path()
-                // Boundary extensions stay vertical and share exact coordinates
-                // with adjacent cells, including the native table's row spacing.
-                if segment.start.line == 0 {
-                    path.move(to: CGPoint(x: start.x, y: 0))
-                    path.addLine(to: start)
-                } else if segment.start.line == Double(graph.lines.count), outgoingPorts.contains(segment.start.column) {
-                    path.move(to: CGPoint(x: start.x, y: size.height))
-                    path.addLine(to: start)
-                } else {
-                    path.move(to: start)
-                }
+                path.move(to: start)
                 if start.x != end.x, start.y != end.y {
                     let bend = (end.y - start.y) * 0.45
                     path.addCurve(to: end,
@@ -58,9 +47,6 @@ struct CommitGraphView: View {
                         control2: CGPoint(x: end.x, y: end.y - bend))
                 } else {
                     path.addLine(to: end)
-                }
-                if segment.end.line == Double(graph.lines.count), outgoingPorts.contains(segment.end.column) {
-                    path.addLine(to: CGPoint(x: end.x, y: size.height))
                 }
                 paths.append((path, start, end, segment.color))
             }
@@ -70,13 +56,18 @@ struct CommitGraphView: View {
                 for item in paths { context.stroke(item.path, with: .color(background), style: casing) }
             }
             for item in paths { context.stroke(item.path, with: .color(color(for: item.color)), style: stroke) }
-            for item in paths where item.start.x != item.end.x {
+            for index in paths.indices where paths[index].start.x != paths[index].end.x {
+                let item = paths[index]
                 if paths.contains(where: { crosses(item.start, item.end, $0.start, $0.end) }) {
-                    // Keep junction endpoints solid; clear only the interior of
-                    // a path that crosses another lane without connecting to it.
+                    // Separate the crossing from the lane beneath, then restore
+                    // the entire connected route. The casing's round ends can
+                    // otherwise erase an adjoining curve even after trimming.
                     let interior = item.path.trimmedPath(from: 0.08, to: 0.92)
                     context.stroke(interior, with: .color(background), style: casing)
-                    context.stroke(interior, with: .color(color(for: item.color)), style: stroke)
+                    for connected in CommitGraphGeometry.connectedStrokeIndices(to: index, in: segments) {
+                        let route = paths[connected]
+                        context.stroke(route.path, with: .color(color(for: route.color)), style: stroke)
+                    }
                 }
             }
             if workingTreeConnection == .continuation {
@@ -116,14 +107,27 @@ struct CommitGraphView: View {
             }
         }
         .clipped()
-        .help("\(accessibilityDescription). Drag the Graph column divider to see more lanes.")
-        .accessibilityLabel(accessibilityDescription)
+        .accessibilityHidden(true)
     }
+}
 
-    private var accessibilityDescription: String {
-        let kind = graph.parentCount == 0 ? "Root commit" : graph.parentCount > 1 ? "Merge commit, \(graph.parentCount) parents" : "Commit, 1 parent"
-        let column = graph.lines[graph.nodeLine].firstIndex { $0.character == "*" } ?? 0
-        return "\(kind), lane \(column / 2 + 1) of \(graph.laneCount)"
+struct WorkingTreeGraphView: View {
+    let connectsToHEAD: Bool
+    let nodeCenter: CGFloat
+
+    var body: some View {
+        Canvas { context, size in
+            let center = CGPoint(x: 10, y: nodeCenter)
+            if connectsToHEAD {
+                var stem = Path()
+                stem.move(to: CGPoint(x: center.x, y: center.y + 5))
+                stem.addLine(to: CGPoint(x: center.x, y: size.height))
+                context.stroke(stem, with: .color(.secondary), style: StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
+            }
+            context.stroke(Path(ellipseIn: CGRect(x: center.x - 5, y: center.y - 5, width: 10, height: 10)),
+                           with: .color(.secondary), lineWidth: 1.5)
+        }
+        .accessibilityHidden(true)
     }
 }
 

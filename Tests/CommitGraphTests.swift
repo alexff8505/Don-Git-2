@@ -5,6 +5,7 @@ import AppKit
 struct CommitGraphTests {
     static func main() async throws {
         let tests = CommitGraphTests()
+        tests.testNativeRowSpansMeetAcrossSpacing()
         try tests.testMergePreservesGitRoutingAndColors()
         try tests.testRootOnSideLaneDoesNotInterruptOtherLane()
         try tests.testCollapsingLanesShareEndpointsAcrossCommits()
@@ -21,7 +22,29 @@ struct CommitGraphTests {
             tests.assertRenderedParents(in: rows)
             print("Verified rendered parent connections for \(rows.count) commits in \(path).")
         }
-        print("Passed 11 graph checks, including working-tree connections, ref pairs, parent topology, lane colour continuity, and native palette contrast.")
+        print("Passed 12 graph checks, including native row spacing, working-tree connections, ref pairs, parent topology, lane colour continuity, and native palette contrast.")
+    }
+
+    func testNativeRowSpansMeetAcrossSpacing() {
+        for spacing: CGFloat in [0, 2, 7, 13] {
+            let rects = [42.0, 72, 42, 108].reduce(into: [CGRect]()) { result, height in
+                result.append(CGRect(x: 0, y: result.last.map { $0.maxY + spacing } ?? 0, width: 100, height: height))
+            }
+            let spans = rects.indices.map { index in
+                CommitGraphRowSpan(row: rects[index], previous: index > 0 ? rects[index - 1] : nil,
+                                   next: index + 1 < rects.count ? rects[index + 1] : nil)
+            }
+            precondition(spans[0].top == rects[0].minY && spans.last!.bottom == rects.last!.maxY)
+            for index in 1..<spans.count {
+                precondition(spans[index - 1].bottom == spans[index].top,
+                             "Graph rows must meet across native spacing, regardless of merge row height")
+                let independentlyVisible = CommitGraphRowSpan(row: rects[index], previous: rects[index - 1],
+                    next: index + 1 < rects.count ? rects[index + 1] : nil)
+                precondition(independentlyVisible.top == spans[index - 1].bottom,
+                             "Scrolling a neighbour offscreen must not change the shared boundary")
+                precondition(spans[index].top < rects[index].midY && spans[index].bottom > rects[index].midY)
+            }
+        }
     }
 
     private func commit(_ hash: String, parents: [String]) -> GitCommit {

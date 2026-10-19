@@ -1,3 +1,17 @@
+import Foundation
+
+/// Neighbouring rows meet halfway through the actual native intercell space.
+/// This also works with different row heights and partially visible rows.
+struct CommitGraphRowSpan {
+    let top: CGFloat
+    let bottom: CGFloat
+
+    init(row: CGRect, previous: CGRect?, next: CGRect?) {
+        top = previous.map { ($0.maxY + row.minY) / 2 } ?? row.minY
+        bottom = next.map { (row.maxY + $0.minY) / 2 } ?? row.maxY
+    }
+}
+
 /// A separate lane bypasses newer commits so uncommitted changes join only HEAD.
 struct WorkingTreeGraphLayout {
     let connections: [String: WorkingTreeGraphConnection]
@@ -27,6 +41,25 @@ enum WorkingTreeGraphConnection: Hashable {
 /// Column coordinates shared by neighbouring ASCII graph lines, including
 /// diagonals that Git advances by one character during a lane collapse.
 enum CommitGraphGeometry {
+    /// A crossing's outline can cover the next piece of the same curved route.
+    /// Repaint the connected stroke, including its junctions, after the outline.
+    static func connectedStrokeIndices(to seed: Int, in segments: [GitGraphSegment]) -> [Int] {
+        var included: Set<Int> = [seed]
+        var endpoints: Set<GitGraphPoint> = [segments[seed].start, segments[seed].end]
+        var changed = true
+        while changed {
+            changed = false
+            for (index, segment) in segments.enumerated() where !included.contains(index) {
+                guard segment.color == segments[seed].color,
+                      endpoints.contains(segment.start) || endpoints.contains(segment.end) else { continue }
+                included.insert(index)
+                endpoints.formUnion([segment.start, segment.end])
+                changed = true
+            }
+        }
+        return included.sorted()
+    }
+
     /// Shared by drawing and topology checks, before macOS row sizing.
     static func segments(for graph: CommitGraphState) -> [GitGraphSegment] {
         var result: [GitGraphSegment] = []

@@ -7,23 +7,17 @@ struct CommitTable: View {
     @FocusState private var hasKeyboardFocus: Bool
 
     var body: some View {
-        let workingTreeLayout = WorkingTreeGraphLayout(rows: rows, hasLocalChanges: localChangesCount > 0)
         return Table(entries, selection: $selectedCommitID) {
             TableColumn("Graph") { row in
-                Group {
-                    if let commit = row.commitRow {
-                        CommitGraphView(graph: commit.graph, isSelected: row.id == selectedCommitID,
-                                        workingTreeConnection: workingTreeLayout.connections[row.id],
-                                        graphInset: workingTreeLayout.graphInset)
-                    } else {
-                        WorkingTreeGraphView(connectsToHEAD: !workingTreeLayout.connections.isEmpty)
-                    }
-                }
-                .frame(height: rowHeight(for: row) + CommitTableMetrics.graphVerticalBleed * 2)
-                .offset(y: -CommitTableMetrics.graphVerticalBleed)
-                .frame(height: rowHeight(for: row), alignment: .top)
+                // The graph is drawn above the native table in one shared layer.
+                // Cells provide sizing and accessibility, never clipped lane fragments.
+                Color.clear
+                    .frame(height: rowHeight(for: row))
+                    .accessibilityLabel(row.commitRow?.graph.accessibilityDescription
+                                        ?? "Uncommitted working tree, based on HEAD")
+                    .help("Follow parent connections from top to bottom. Drag the Graph column divider to see more lanes.")
             }
-            .width(min: 42, ideal: 96, max: max(2_000, graphWidth + workingTreeLayout.graphInset))
+            .width(min: 42, ideal: 96, max: max(2_000, graphWidth + 16))
 
             TableColumn("Commit") { row in
                 if let commit = row.commitRow {
@@ -73,6 +67,7 @@ struct CommitTable: View {
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
         .background(CommitTableColumnPersistence(selectedRowIndex: entries.firstIndex { $0.id == selectedCommitID }))
+        .background(CommitGraphOverlay(rows: rows, hasLocalChanges: localChangesCount > 0))
         .focused($hasKeyboardFocus)
         .simultaneousGesture(TapGesture().onEnded {
             hasKeyboardFocus = true
@@ -96,28 +91,8 @@ struct CommitTable: View {
 
 }
 
-private struct WorkingTreeGraphView: View {
-    let connectsToHEAD: Bool
-
-    var body: some View {
-        Canvas { context, size in
-            let center = CGPoint(x: 10, y: size.height / 2)
-            if connectsToHEAD {
-                var stem = Path()
-                stem.move(to: CGPoint(x: center.x, y: center.y + 5))
-                stem.addLine(to: CGPoint(x: center.x, y: size.height))
-                context.stroke(stem, with: .foreground, style: StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
-            }
-            context.stroke(Path(ellipseIn: CGRect(x: center.x - 5, y: center.y - 5, width: 10, height: 10)),
-                           with: .foreground, lineWidth: 1.5)
-        }
-        .accessibilityLabel("Uncommitted working tree, based on HEAD")
-    }
-}
-
 private enum CommitTableMetrics {
     static let rowHeight: CGFloat = 42
-    static let graphVerticalBleed: CGFloat = 7
 }
 
 private struct CommitSummaryCell: View {

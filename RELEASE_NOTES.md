@@ -1,5 +1,13 @@
 # Changelog
 
+## 19 October 2026 — Continuous graph drawing
+
+- Draw graph lanes in a shared layer above the native table, avoiding the row clipping that caused gaps between commits.
+- Join neighbouring rows halfway through their measured spacing, including taller merge rows, and keep nodes aligned with their commits.
+- Preserve Git's branch ordering, parent connections, lane colours, separate crossings and dotted working-tree connection to HEAD.
+- Keep crossing outlines from erasing adjoining pieces of the same curve; check the WTC crossing pixel by pixel with and without selection.
+- Add regression checks for varied row heights and spacing, plus native overlay scrolling, column resizing, input handling and cleanup.
+
 ## 19 October 2026 — Checkout markers and clearer branch history
 
 ### Identify checkouts
