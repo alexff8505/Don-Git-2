@@ -4,6 +4,15 @@ Date: 19 October 2026
 
 final result: passed
 
+## Latest refinement: matching checkout icons
+
+- Both checkout types now use the same compact icon placement inside the local branch capsule: house for the main checkout, folder for linked worktrees. Removed the Worktree text while retaining the native tooltip and accessible checkout type/path. Both icons use the same system font, padding and semantic color. No data, pairing or graph behavior changed.
+
+## Previous refinement: compact main checkout marker
+
+- Replaced the separate grey Main checkout capsule with the native SF Symbols house icon inside the local branch capsule, as requested. Existing hover text and accessibility descriptions still identify Main checkout and its full path.
+- Packaged build and whitespace checks pass. Native CUA screenshot review on avail-admin confirms the house beside dev, directly followed by origin/dev; main/origin-main remains a separate pair. Existing repository, selected commit, appearance and diff presentation were retained. Earlier comparisons below document the previous label treatment.
+
 ## Follow-up: HEAD connection and branch pairs
 
 - User-approved follow-up on 19 October 2026: restore the dotted connection to actual HEAD even below other branch tips, and group local/remote pills into logical pairs.

@@ -150,21 +150,10 @@ private struct RefBadgeView: View {
     let badge: GitRefBadge
 
     var body: some View {
-        HStack(spacing: 5) {
-            capsule
-            if badge.checkout?.isMain == true {
-                Text("Main checkout")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(.quaternary, in: Capsule())
-            }
-        }
-        .fixedSize(horizontal: true, vertical: false)
-        .help(badge.checkout.map { "\(badge.name)\n\($0.help)" } ?? badge.name)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityDescription)
+        capsule
+            .help(badge.checkout.map { "\(badge.name)\n\($0.help)" } ?? badge.name)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityDescription)
     }
 
     private var capsule: some View {
@@ -175,9 +164,10 @@ private struct RefBadgeView: View {
             }
             Text(badge.kind == .tag ? "tag: \(badge.name)" : badge.name)
                 .lineLimit(1)
-            if badge.checkout?.isMain == false {
-                Label("Worktree", systemImage: "folder")
+            if let checkout = badge.checkout {
+                Image(systemName: checkout.isMain ? "house" : "folder")
                     .padding(.leading, 6)
+                    .accessibilityHidden(true)
             }
         }
         .font(.caption2.weight(.semibold))
