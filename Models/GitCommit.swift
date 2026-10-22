@@ -89,8 +89,10 @@ struct CommitGraphState: Hashable, Sendable {
     let parentCount: Int
     let incomingColor: [Int]?
     let outgoingColor: [Int]?
+    var pathSegments: [GitGraphSegment]? = nil
+    var displayNodeColor: [Int]? = nil
 
-    var nodeColor: [Int] { incomingColor ?? outgoingColor ?? [34] }
+    var nodeColor: [Int] { displayNodeColor ?? incomingColor ?? outgoingColor ?? [34] }
 
     var accessibilityDescription: String {
         let kind = parentCount == 0 ? "Root commit" : parentCount > 1 ? "Merge commit, \(parentCount) parents" : "Commit, 1 parent"
@@ -109,5 +111,16 @@ struct CommitGraphState: Hashable, Sendable {
 
 struct GitGraphGlyph: Hashable, Sendable {
     let character: Character
+    let color: [Int]
+}
+
+struct GitGraphPoint: Hashable, Sendable {
+    let column: Double
+    let line: Double
+}
+
+struct GitGraphSegment: Hashable, Sendable {
+    let start: GitGraphPoint
+    let end: GitGraphPoint
     let color: [Int]
 }

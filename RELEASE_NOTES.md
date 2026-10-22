@@ -1,5 +1,11 @@
 # Changelog
 
+## 22 October 2026 — Clearer merge paths
+
+- Smooth temporary lane expansion and collapse steps into continuous curves around merge commits.
+- Keep each path's colour consistent through passing rows and give additional parent connections distinct colours until they reach a real junction.
+- Preserve Git's commit order and parent connections, with regression checks for merge routing, path colours and selected-row rendering.
+
 ## 19 October 2026 — Continuous graph drawing
 
 - Draw graph lanes in a shared layer above the native table, avoiding the row clipping that caused gaps between commits.

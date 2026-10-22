@@ -10,6 +10,7 @@ struct CommitGraphTests {
         try tests.testRootOnSideLaneDoesNotInterruptOtherLane()
         try tests.testCollapsingLanesShareEndpointsAcrossCommits()
         try tests.testNeutralNodesRetainLaneColors()
+        try tests.testDistinctMergePathColors()
         tests.testNativePaletteContrast()
         tests.testHistoryMismatchIsRejected()
         tests.testDecorationOrderMatchesGit()
@@ -22,7 +23,7 @@ struct CommitGraphTests {
             tests.assertRenderedParents(in: rows)
             print("Verified rendered parent connections for \(rows.count) commits in \(path).")
         }
-        print("Passed 12 graph checks, including native row spacing, working-tree connections, ref pairs, parent topology, lane colour continuity, and native palette contrast.")
+        print("Passed 13 graph checks, including native row spacing, working-tree connections, ref pairs, parent topology, distinct merge paths, lane colour continuity, and native palette contrast.")
     }
 
     func testNativeRowSpansMeetAcrossSpacing() {
@@ -197,6 +198,37 @@ struct CommitGraphTests {
             }
         }
     }
+
+    func testDistinctMergePathColors() throws {
+        let commits = [commit("main", parents: ["merge", "dev"]),
+            commit("dev", parents: ["pdf", "topic"]), commit("pdf", parents: ["older"]),
+            commit("merge", parents: ["older", "topic"]), commit("topic", parents: ["root"]),
+            commit("older", parents: ["root"]), commit("root", parents: [])]
+        let lines: [(String, String?)] = [("*", "main"), ("|\\", nil), ("| *", "dev"),
+            ("| |\\", nil), ("| * |", "pdf"), ("* | |", "merge"), ("|\\ \\ \\", nil),
+            ("| |/ /", nil), ("|/| /", nil), ("| |/", nil), ("| *", "topic"),
+            ("* |", "older"), ("|/", nil), ("*", "root")]
+        // Reproduce Git's all-blue merge routing from avail-admin d105896.
+        let output = lines.map { prefix, hash in
+            "\u{1b}[34m" + prefix + "\u{1b}[m" + (hash.map { " \u{1f}" + $0 } ?? "")
+        }.joined(separator: "\n")
+        let raw = try CommitGraphBuilder().rows(for: commits, graphOutput: output)
+        let rows = CommitGraphColors.apply(to: raw)
+        precondition(rows == CommitGraphColors.apply(to: raw), "Path colours must be deterministic")
+        let merge = rows[3].graph.pathSegments!
+        let entries = merge.filter { $0.start.line == 0 }.map(\.color)
+        precondition(entries.count == 3 && Set(entries).count == 3,
+                     "All three incoming paths must retain distinct colours through the merge")
+        let parentBranch = merge.first { $0.start == GitGraphPoint(column: 0, line: 1)
+            && $0.end == GitGraphPoint(column: 2, line: 2) }!
+        precondition(!entries.contains(parentBranch.color), "The extra parent needs its own colour")
+        for row in rows[1...3] {
+            precondition(row.graph.displayNodeColor == row.graph.pathSegments!.first {
+                $0.end == GitGraphPoint(column: Double(row.graph.lines[0].firstIndex { $0.character == "*" }!), line: 0.5)
+            }?.color, "Commit nodes must inherit their incoming path colour")
+        }
+        assertRenderedParents(in: raw)
+    }
     func testRealGitOctopusHistory() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -289,13 +321,54 @@ struct CommitGraphTests {
     /// Unlike a boundary-only check, this catches missing octopus stems, false
     /// connections at crossings, dangling routes, and joins to the wrong hash.
     func assertRenderedParents(in rows: [CommitRow]) {
+        assertRenderedParents(in: rows, smoothed: false)
+        let colored = CommitGraphColors.apply(to: rows)
+        assertPathColors(in: colored)
+        assertRenderedParents(in: colored, smoothed: true)
+    }
+
+    private func assertPathColors(in rows: [CommitRow]) {
+        var boundary: [Double: [Int]] = [:]
+        for row in rows {
+            let segments = row.graph.pathSegments!
+            precondition(segments.count == CommitGraphGeometry.segments(for: row.graph).count)
+            var incoming: [GitGraphPoint: [[Int]]] = [:]
+            var outgoing: [GitGraphPoint: [[Int]]] = [:]
+            for segment in segments {
+                let reverse = segment.start.line == segment.end.line && segment.start.line.rounded() == segment.start.line
+                let start = reverse ? segment.end : segment.start
+                let end = reverse ? segment.start : segment.end
+                incoming[end, default: []].append(segment.color)
+                outgoing[start, default: []].append(segment.color)
+                if start.line == 0, let previous = boundary[start.column] {
+                    precondition(segment.color == previous, "Path colour changed between commit rows")
+                }
+            }
+            for (point, colors) in outgoing {
+                if colors.count > 1 {
+                    precondition(Set(colors).count == colors.count, "Separate parent paths must have distinct colours")
+                } else if let inputs = incoming[point], inputs.count == 1 {
+                    precondition(inputs == colors, "Path colour changed before reaching a junction")
+                }
+            }
+            boundary = incoming.reduce(into: [:]) { result, entry in
+                if entry.key.line == Double(row.graph.lines.count), entry.value.count == 1 {
+                    result[entry.key.column] = entry.value[0]
+                }
+            }
+        }
+    }
+
+    private func assertRenderedParents(in rows: [CommitRow], smoothed: Bool) {
         var adjacency: [GitGraphPoint: Set<GitGraphPoint>] = [:]
         var nodes: [GitGraphPoint: GitCommit] = [:]
         var offset = 0.0
         for row in rows {
             let column = row.graph.lines[row.graph.nodeLine].firstIndex { $0.character == "*" }!
             nodes[GitGraphPoint(column: Double(column), line: offset + Double(row.graph.nodeLine) + 0.5)] = row.commit
-            for segment in CommitGraphGeometry.segments(for: row.graph) {
+            let segments = smoothed ? CommitGraphGeometry.drawingSegments(for: row.graph)
+                : CommitGraphGeometry.segments(for: row.graph)
+            for segment in segments {
                 let start = GitGraphPoint(column: segment.start.column, line: segment.start.line + offset)
                 let end = GitGraphPoint(column: segment.end.column, line: segment.end.line + offset)
                 adjacency[start, default: []].insert(end)

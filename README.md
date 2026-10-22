@@ -59,6 +59,7 @@ Switch repositories and return to the commit you were reviewing. Resized history
 - Distinguish local and remote branches with subtle system green and red tints that adapt to light, dark, and increased-contrast appearances.
 - Spot linked worktrees by the folder icon inside local branch badges; a house icon identifies the main checkout. Hover for the checkout type and folder path; markers refresh as worktrees change.
 - Read continuous coloured lanes, curved joins, and outlined merge nodes in both light and dark appearances. Crossings stay separate from parent junctions.
+- Follow distinct path colours through merges: passing lanes keep their colour, and each additional parent connection gets a different colour until it joins another path.
 - Graph lines share a drawing layer above the native rows, spanning their measured spacing without breaks when scrolling, selecting commits or resizing columns.
 - Read the current branch, commit count, and working-tree status in the bottom bar.
 - Automatically fetch origin when opening a repository, returning to the app, and every minute. The graph shows the latest fetched origin branch positions, including new branches, force-pushes, and deletions.

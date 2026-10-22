@@ -34,7 +34,7 @@ struct CommitGraphView: View {
                                      lineCap: .round, lineJoin: .round)
             let casing = StrokeStyle(lineWidth: stroke.lineWidth + 2, lineCap: .round, lineJoin: .round)
             let background = Color(nsColor: .controlBackgroundColor)
-            let segments = CommitGraphGeometry.segments(for: graph)
+            let segments = CommitGraphGeometry.drawingSegments(for: graph)
             var paths: [(path: Path, start: CGPoint, end: CGPoint, color: [Int])] = []
             for segment in segments {
                 let start = point(segment.start), end = point(segment.end)
@@ -60,7 +60,7 @@ struct CommitGraphView: View {
                 let item = paths[index]
                 if paths.contains(where: { crosses(item.start, item.end, $0.start, $0.end) }) {
                     // Separate the crossing from the lane beneath, then restore
-                    // the entire connected route. The casing's round ends can
+                    // the uninterrupted route. The casing's round ends can
                     // otherwise erase an adjoining curve even after trimming.
                     let interior = item.path.trimmedPath(from: 0.08, to: 0.92)
                     context.stroke(interior, with: .color(background), style: casing)

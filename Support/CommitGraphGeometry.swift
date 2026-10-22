@@ -41,8 +41,39 @@ enum WorkingTreeGraphConnection: Hashable {
 /// Column coordinates shared by neighbouring ASCII graph lines, including
 /// diagonals that Git advances by one character during a lane collapse.
 enum CommitGraphGeometry {
+    /// Git expands and collapses lanes in separate text rows. Keep their
+    /// junctions, but draw each uninterrupted route as one smooth connection.
+    static func drawingSegments(for graph: CommitGraphState) -> [GitGraphSegment] {
+        let nodeLine = Double(graph.nodeLine) + 0.5
+        let segments = (graph.pathSegments ?? segments(for: graph)).flatMap { segment -> [GitGraphSegment] in
+            guard segment.start.line < nodeLine, segment.end.line > nodeLine else { return [segment] }
+            let fraction = (nodeLine - segment.start.line) / (segment.end.line - segment.start.line)
+            let middle = GitGraphPoint(column: segment.start.column
+                + (segment.end.column - segment.start.column) * fraction, line: nodeLine)
+            return [GitGraphSegment(start: segment.start, end: middle, color: segment.color),
+                    GitGraphSegment(start: middle, end: segment.end, color: segment.color)]
+        }
+        let incoming = Dictionary(grouping: segments.indices, by: { segments[$0].end })
+        let outgoing = Dictionary(grouping: segments.indices, by: { segments[$0].start })
+        func continuation(after index: Int) -> Int? {
+            let segment = segments[index]
+            guard segment.start.line >= nodeLine, segment.end.line > segment.start.line,
+                  incoming[segment.end]?.count == 1, let next = outgoing[segment.end], next.count == 1,
+                  segments[next[0]].end.line > segment.end.line,
+                  segments[next[0]].color == segment.color else { return nil }
+            return next[0]
+        }
+        let continued = Set(segments.indices.compactMap { continuation(after: $0) })
+        return segments.indices.filter { !continued.contains($0) }.map { index in
+            var last = index
+            while let next = continuation(after: last) { last = next }
+            return GitGraphSegment(start: segments[index].start, end: segments[last].end, color: segments[index].color)
+        }
+    }
+
     /// A crossing's outline can cover the next piece of the same curved route.
-    /// Repaint the connected stroke, including its junctions, after the outline.
+    /// Repaint its uninterrupted stroke after the outline, stopping at junctions
+    /// so a different branch of the same colour cannot paint over the bridge.
     static func connectedStrokeIndices(to seed: Int, in segments: [GitGraphSegment]) -> [Int] {
         var included: Set<Int> = [seed]
         var endpoints: Set<GitGraphPoint> = [segments[seed].start, segments[seed].end]
@@ -50,8 +81,10 @@ enum CommitGraphGeometry {
         while changed {
             changed = false
             for (index, segment) in segments.enumerated() where !included.contains(index) {
-                guard segment.color == segments[seed].color,
-                      endpoints.contains(segment.start) || endpoints.contains(segment.end) else { continue }
+                let sharesRoute = [segment.start, segment.end].contains { point in
+                    endpoints.contains(point) && segments.filter { $0.start == point || $0.end == point }.count == 2
+                }
+                guard segment.color == segments[seed].color, sharesRoute else { continue }
                 included.insert(index)
                 endpoints.formUnion([segment.start, segment.end])
                 changed = true
@@ -215,15 +248,4 @@ enum CommitGraphGeometry {
         }
         return column
     }
-}
-
-struct GitGraphPoint: Hashable, Sendable {
-    let column: Double
-    let line: Double
-}
-
-struct GitGraphSegment: Hashable, Sendable {
-    let start: GitGraphPoint
-    let end: GitGraphPoint
-    let color: [Int]
 }

@@ -24,6 +24,7 @@ final class CommitGraphAttachmentView: NSView {
     private weak var table: NSTableView?
     private weak var clip: NSClipView?
     private var rows: [CommitRow] = []
+    private var sourceRows: [CommitRow] = []
     private var hasLocalChanges = false
     private var workingTree = WorkingTreeGraphLayout(rows: [], hasLocalChanges: false)
     private var connectionScheduled = false
@@ -31,8 +32,9 @@ final class CommitGraphAttachmentView: NSView {
     private let overlay = GraphHostingView(rootView: CommitGraphLayer(items: []))
 
     func update(rows: [CommitRow], hasLocalChanges: Bool) {
-        if self.rows != rows || self.hasLocalChanges != hasLocalChanges {
-            self.rows = rows
+        if sourceRows != rows || self.hasLocalChanges != hasLocalChanges {
+            sourceRows = rows
+            self.rows = CommitGraphColors.apply(to: rows)
             self.hasLocalChanges = hasLocalChanges
             workingTree = WorkingTreeGraphLayout(rows: rows, hasLocalChanges: hasLocalChanges)
         }
