@@ -11,6 +11,7 @@ struct CommitGraphTests {
         try tests.testCollapsingLanesShareEndpointsAcrossCommits()
         try tests.testNeutralNodesRetainLaneColors()
         try tests.testDistinctMergePathColors()
+        try tests.testThreeParentMergeWithDuplicateLane()
         tests.testNativePaletteContrast()
         tests.testHistoryMismatchIsRejected()
         tests.testDecorationOrderMatchesGit()
@@ -23,7 +24,7 @@ struct CommitGraphTests {
             tests.assertRenderedParents(in: rows)
             print("Verified rendered parent connections for \(rows.count) commits in \(path).")
         }
-        print("Passed 13 graph checks, including native row spacing, working-tree connections, ref pairs, parent topology, distinct merge paths, lane colour continuity, and native palette contrast.")
+        print("Passed 14 graph checks, including native row spacing, working-tree connections, ref pairs, three-parent duplicate lanes, parent topology, distinct merge paths, lane colour continuity, and native palette contrast.")
     }
 
     func testNativeRowSpansMeetAcrossSpacing() {
@@ -229,6 +230,36 @@ struct CommitGraphTests {
         }
         assertRenderedParents(in: raw)
     }
+
+    func testThreeParentMergeWithDuplicateLane() throws {
+        let commits = [commit("merge", parents: ["first", "second", "third"]),
+            commit("second", parents: []), commit("passingRight", parents: []),
+            commit("first", parents: []), commit("passingLeft", parents: []), commit("third", parents: [])]
+        // Reduced from the failing dense history. The vertical lane beside the
+        // new '\\' duplicates an existing parent on its left, while the new
+        // lane immediately collapses. Git can give both the same ANSI colour.
+        let lines: [(String, String?)] = [("| | | | | *", "merge"), ("| | | |_|/|\\", nil),
+            ("| | |/| |/", nil), ("| |_|_|/|", nil), ("|/| | | |", nil),
+            ("| | | | *", "second"), ("| | | *", "passingRight"),
+            ("| | *", "first"), ("| *", "passingLeft"), ("*", "third")]
+        let output = lines.map { prefix, hash in
+            "\u{1b}[32m" + prefix + "\u{1b}[m" + (hash.map { " \u{1f}" + $0 } ?? "")
+        }.joined(separator: "\n")
+        let rows = try CommitGraphBuilder().rows(for: commits, graphOutput: output)
+        assertRenderedParents(in: rows)
+        // If more collapsing lanes follow on the right (an octopus merge),
+        // the middle slash must still connect to the vertical above it.
+        func line(_ text: String) -> [GitGraphGlyph] {
+            text.map { GitGraphGlyph(character: $0, color: [32]) }
+        }
+        let expanded = line("|/|\\ \\")
+        let collapsing = line("|/ / /")
+        let slash = CommitGraphGeometry.endpoints(column: 1, line: collapsing, previous: expanded, next: [])
+        let vertical = CommitGraphGeometry.endpoints(column: 2, line: expanded, previous: [], next: collapsing)
+        precondition(slash.upper == 2 && vertical.lower == 2,
+                     "Continuing octopus expansion must not be mistaken for a duplicate parent")
+    }
+
     func testRealGitOctopusHistory() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -426,6 +457,12 @@ private struct GraphFixture {
         process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
         process.arguments = ["-C", directory.path, "-c", "user.name=Graph Test", "-c", "user.email=graph@example.invalid",
                              "-c", "commit.gpgsign=false"] + arguments
+        // Stable timestamps keep dense graph ordering and hashes reproducible
+        // instead of changing which lane layouts are tested on every run.
+        process.environment = ProcessInfo.processInfo.environment.merging([
+            "GIT_AUTHOR_DATE": "2026-01-01T00:00:00+0000",
+            "GIT_COMMITTER_DATE": "2026-01-01T00:00:00+0000"
+        ]) { _, fixed in fixed }
         let output = Pipe()
         process.standardOutput = output
         let stdin = Pipe()

@@ -5,6 +5,7 @@
 - Smooth temporary lane expansion and collapse steps into continuous curves around merge commits.
 - Keep each path's colour consistent through passing rows and give additional parent connections distinct colours until they reach a real junction.
 - Preserve Git's commit order and parent connections, with regression checks for merge routing, path colours and selected-row rendering.
+- Retain every parent connection when a three-parent merge collapses a duplicate lane beside a new path using the same Git colour.
 
 ## 19 October 2026 — Continuous graph drawing
 

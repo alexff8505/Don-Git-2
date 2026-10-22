@@ -151,11 +151,9 @@ enum CommitGraphGeometry {
         if glyph.character == "/" {
             if let connector = horizontalConnector(in: previous), column == connector.first - 2 {
                 joinedUpper = Double(column) + 1.5
-            } else if matches(previous, at: column + 2, character: "\\", color: glyph.color),
-                      !matches(previous, at: column, character: "\\", color: glyph.color),
-                      !matches(previous, at: column + 1, character: "|", color: glyph.color) {
+            } else if let source = expandedSlashSource(column: column, line: line, previous: previous) {
                 // A newly added lane can immediately collapse back to the left.
-                joinedUpper = Double(column + 2)
+                joinedUpper = source
             } else if character(in: previous, at: column + 2) == "/",
                       character(in: line, at: column + 1) == "|" {
                 // '| |/' -> '|/|' is a crossing, with separate boundary ports.
@@ -175,7 +173,7 @@ enum CommitGraphGeometry {
                 joinedUpper = Double(column) - 0.5
             }
             if matches(next, at: column - 2, character: "|", color: glyph.color),
-               !hasIncomingEdge(in: next, at: column, color: glyph.color) {
+               !hasIncomingEdge(in: next, previous: line, at: column, color: glyph.color) {
                 // A parent already occupies the lane to the left; Git removes
                 // the duplicate instead of emitting another collapse slash.
                 joinedLower = Double(column - 2)
@@ -185,7 +183,7 @@ enum CommitGraphGeometry {
                !matches(next, at: column, character: "/", color: glyph.color) {
                 joinedLower = Double(column)
             } else if matches(next, at: column - 1, character: "|", color: glyph.color),
-                      !hasIncomingEdge(in: next, at: column + 1, color: glyph.color) {
+                      !hasIncomingEdge(in: next, previous: line, at: column + 1, color: glyph.color) {
                 joinedLower = Double(column - 1)
             }
         }
@@ -200,9 +198,31 @@ enum CommitGraphGeometry {
         line.indices.contains(index) && line[index].character == character && line[index].color == color
     }
 
-    private static func hasIncomingEdge(in line: [GitGraphGlyph], at column: Int, color: [Int]) -> Bool {
+    /// When '|/|\\' collapses to '|/', the rightmost slash comes from the
+    /// newly expanded lane. The middle vertical may duplicate the lane on its
+    /// left even when Git reuses one colour for all three routes.
+    private static func expandedSlashSource(
+        column: Int, line: [GitGraphGlyph], previous: [GitGraphGlyph]
+    ) -> Double? {
+        let glyph = line[column]
+        guard glyph.character == "/",
+              matches(previous, at: column + 2, character: "\\", color: glyph.color),
+              !matches(previous, at: column, character: "\\", color: glyph.color) else { return nil }
+        let duplicatesLeftLane = matches(previous, at: column - 1, character: "|", color: glyph.color)
+            && matches(line, at: column - 1, character: "|", color: glyph.color)
+            && character(in: line, at: column + 2) != "/"
+        guard !matches(previous, at: column + 1, character: "|", color: glyph.color)
+                || duplicatesLeftLane else { return nil }
+        return Double(column + 2)
+    }
+
+    private static func hasIncomingEdge(
+        in line: [GitGraphGlyph], previous: [GitGraphGlyph], at column: Int, color: [Int]
+    ) -> Bool {
         line.indices.contains { index in
-            rawEndpoints(column: index, character: line[index].character).upper == Double(column)
+            let upper = expandedSlashSource(column: index, line: line, previous: previous)
+                ?? rawEndpoints(column: index, character: line[index].character).upper
+            return upper == Double(column)
                 && (line[index].character == "*" || line[index].color == color)
         }
     }
